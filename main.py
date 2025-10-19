@@ -117,75 +117,6 @@ def load_custom_css():
             border-right: 1px solid rgba(255, 255, 255, 0.1);
         }
         
-        /* Tab styling */
-        .stTabs [data-baseweb="tab-list"] {
-            gap: 8px;
-            background-color: transparent;
-        }
-        
-        .stTabs [data-baseweb="tab"] {
-            background-color: var(--card-bg);
-            border-radius: 8px;
-            padding: 0.75rem 1.5rem;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            color: #A0A0A0;
-            font-weight: 600;
-        }
-        
-        .stTabs [aria-selected="true"] {
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            color: white;
-            border: none;
-        }
-        
-        /* Expander styling */
-        .streamlit-expanderHeader {
-            background-color: var(--card-bg);
-            border-radius: 8px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            font-weight: 600;
-        }
-        
-        /* Dataframe styling */
-        .stDataFrame {
-            border-radius: 8px;
-            overflow: hidden;
-        }
-        
-        /* Input styling */
-        .stTextInput input, .stSelectbox select {
-            background-color: var(--card-bg);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 8px;
-            color: white;
-            padding: 0.75rem;
-        }
-        
-        /* Alert styling */
-        .stAlert {
-            border-radius: 8px;
-            border: none;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-        }
-        
-        /* Success alert */
-        .stAlert[data-baseweb="notification"] {
-            background-color: rgba(6, 214, 160, 0.1);
-            border-left: 4px solid var(--success-color);
-        }
-        
-        /* Info alert */
-        .stInfo {
-            background-color: rgba(0, 180, 216, 0.1);
-            border-left: 4px solid var(--secondary-color);
-        }
-        
-        /* Warning alert */
-        .stWarning {
-            background-color: rgba(255, 214, 10, 0.1);
-            border-left: 4px solid var(--warning-color);
-        }
-        
         /* Hide Streamlit branding */
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
@@ -193,11 +124,6 @@ def load_custom_css():
         /* Smooth scrolling */
         html {
             scroll-behavior: smooth;
-        }
-        
-        /* Loading spinner */
-        .stSpinner > div {
-            border-color: var(--secondary-color) transparent transparent transparent;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -231,8 +157,83 @@ def init_data_source():
         st.error(f"Error loading data: {e}")
         return None
 
+def show_login_page():
+    """
+    Display login page
+    """
+    from security.auth import AuthManager
+    
+    # DON'T call st.set_page_config() here - it's already called at the top!
+    
+    # Center the login form
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col2:
+        st.title("🚢 PSA Global Insights")
+        st.subheader("Please log in to continue")
+        
+        # Login form
+        with st.form("login_form"):
+            username = st.text_input("Username", placeholder="Enter your username")
+            password = st.text_input("Password", type="password", placeholder="Enter your password")
+            submit = st.form_submit_button("Login", use_container_width=True, type="primary")
+            
+            if submit:
+                if not username or not password:
+                    st.error("Please enter both username and password")
+                else:
+                    # Attempt login
+                    auth = AuthManager()
+                    success, message, user_info = auth.login(username, password)
+                    
+                    if success:
+                        st.success(message)
+                        st.rerun()  # Reload page to show main app
+                    else:
+                        st.error(message)
+        
+        # Help text
+        st.divider()
+        st.caption("🔒 Your connection is secure")
+        
+        # Temporary: Show test credentials (REMOVE IN PRODUCTION!)
+        with st.expander("📝 Test Credentials (Development Only)"):
+            st.info("""
+            **Admin Account:**
+            - Username: `admin`
+            - Password: `admin123`
+            
+            **Operations User:**
+            - Username: `operations_user`
+            - Password: `ops123`
+            
+            **Viewer:**
+            - Username: `viewer`
+            - Password: `view123`
+            
+            ⚠️ **IMPORTANT:** Change these passwords in production!
+            """)
+
 def main():
     """Main application entry point"""
+    
+    # Check if user needs to log in
+    from security.auth import AuthManager
+    from security.session_manager import validate_session
+    
+    auth = AuthManager()
+    
+    # Check if user is authenticated
+    if not auth.is_authenticated():
+        # Show login page
+        show_login_page()
+        return  # Stop here until logged in
+    
+    # Validate session (check timeouts)
+    validate_session()
+    
+    # Original code continues
+    chat_overlay()
 
     # Load custom CSS
     load_custom_css()

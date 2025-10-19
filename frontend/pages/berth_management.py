@@ -369,6 +369,10 @@ def create_berth_recommendations():
 def render():
     """Render the Berth Management page"""
     
+    # ✅ ADD: Permission check
+    from config.permissions import Permission, require_permission
+    require_permission(Permission.VIEW_BERTH_MANAGEMENT)
+
     # Berth status overview
     st.subheader("⚓ Berth Status Overview")
     create_berth_status_overview()

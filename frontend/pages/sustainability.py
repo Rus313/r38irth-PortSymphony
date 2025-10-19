@@ -453,6 +453,10 @@ def create_sustainability_score_breakdown():
 
 def render():
     """Render the Sustainability page"""
+
+     # ✅ ADD: Permission check
+    from config.permissions import Permission, require_permission
+    require_permission(Permission.VIEW_SUSTAINABILITY)
     
     # Carbon KPIs
     st.subheader("🌱 Carbon Performance Overview")
