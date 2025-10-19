@@ -10,6 +10,7 @@ import sys
 # Add project root to path
 sys.path.append(str(Path(__file__).parent))
 
+from data.pdf_loader import get_data_loader
 from frontend.config import PageConfig
 from frontend.components.sidebar import render_sidebar
 from frontend.components.header import render_header
@@ -217,6 +218,15 @@ def initialize_session_state():
     if 'theme' not in st.session_state:
         st.session_state.theme = 'dark'
 
+@st.cache_resource
+def init_data_source():
+    """Initialize data source from PDF"""
+    try:
+        return get_data_loader('data/ship_movements.pdf')
+    except Exception as e:
+        st.error(f"Error loading data: {e}")
+        return None
+
 def main():
     """Main application entry point"""
     
@@ -225,6 +235,11 @@ def main():
     
     # Initialize session state
     initialize_session_state()
+
+    data_source = init_data_source()
+    if data_source is None:
+        st.error("Failed to load data. Please check your PDF file.")
+        st.stop()
     
     # Render header
     render_header()
