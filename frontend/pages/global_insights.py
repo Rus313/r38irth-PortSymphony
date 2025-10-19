@@ -237,6 +237,10 @@ def create_vessel_status_chart():
 
 def render():
     """Render the Global Insights page"""
+
+    # ✅ ADD: Permission check
+    from config.permissions import Permission, require_permission
+    require_permission(Permission.VIEW_DASHBOARD)
     
     # KPI Metrics Row
     st.subheader("📊 Key Performance Indicators")

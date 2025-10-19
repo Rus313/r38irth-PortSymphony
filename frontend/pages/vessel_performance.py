@@ -411,6 +411,10 @@ def create_movement_history_table():
 
 def render():
     """Render the Vessel Performance page"""
+
+    # ✅ ADD: Permission check
+    from config.permissions import Permission, require_permission
+    require_permission(Permission.VIEW_VESSELS)
     
     # Vessel selector
     selected_vessel, imo = create_vessel_selector()

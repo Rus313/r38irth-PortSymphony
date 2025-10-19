@@ -24,18 +24,43 @@ def ask_ai(messages: List[Dict]) -> str:
     Sends messages to Azure OpenAI via REST API using configkeys.
     Returns AI response text.
     """
+    # ✅ ADD: Rate limiting check
+    from security.rate_limiting import check_rate_limit
+    check_rate_limit()
+    
+    # ✅ ADD: Input validation
+    from security.validation import InputValidator
+    for msg in messages:
+        if 'content' in msg:
+            # Check for SQL injection attempts
+            if InputValidator.check_sql_injection(msg['content']):
+                logger.error("SQL injection attempt in AI query")
+                return "❌ Invalid input detected"
+            
+            # Sanitize HTML
+            msg['content'] = InputValidator.sanitize_html(msg['content'])
+    
     url = f"{configkeys.AZURE_OPENAI_ENDPOINT}openai/deployments/{configkeys.DEPLOYMENT_ID}/chat/completions?api-version={configkeys.AZURE_OPENAI_API_VERSION}"
     headers = {"Content-Type": "application/json", "api-key": configkeys.AZURE_OPENAI_API_KEY}
     payload = {"messages": messages, "temperature": 0.7}
 
     try:
-        response = requests.post(url, headers=headers, json=payload)
+        response = requests.post(url, headers=headers, json=payload, timeout=30)  # ✅ ADD: timeout
         response.raise_for_status()
         data = response.json()
         return data["choices"][0]["message"]["content"]
+    except requests.exceptions.Timeout:  # ✅ ADD: Better error handling
+        logger.error("AI service timeout")
+        return "❌ Request timeout. Please try again."
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 429:
+            logger.warning("Rate limit exceeded on AI service")
+            return "❌ Too many requests. Please wait a moment."
+        logger.error(f"AI service error: {str(e)}")
+        return f"❌ Error contacting AI service"
     except Exception as e:
         logger.error(f"ask_ai error: {str(e)}")
-        return f"❌ Error contacting AI: {str(e)}"
+        return f"❌ Unexpected error occurred"
 
 # ============================================
 # Configuration class

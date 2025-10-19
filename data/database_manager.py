@@ -118,19 +118,27 @@ class DatabaseManager:
     def get_vessel_by_imo(self, imo_number: str) -> Optional[Dict]:
         """Get vessel details by IMO number"""
         
-        query = """
-        SELECT *
-        FROM vessels
-        WHERE imo_number = %s
-        """
+        # ✅ ADD: Input validation
+        from security.validation import validate_imo
+        is_valid, message = validate_imo(imo_number)
+        if not is_valid:
+            logger.warning(f"Invalid IMO number: {imo_number}")
+            return None
         
-        with self.get_connection() as conn:
-            cursor = conn.cursor(dictionary=True)
-            cursor.execute(query, (imo_number,))
-            result = cursor.fetchone()
-            cursor.close()
-            
-        return result
+        # ✅ IMPORTANT: Use %s placeholders (already correct in your code!)
+        query = """
+            SELECT *
+            FROM vessels
+            WHERE imo_number = %s
+        """
+    
+    with self.get_connection() as conn:
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(query, (imo_number,))  # ✅ This is correct - using tuple for parameters
+        result = cursor.fetchone()
+        cursor.close()
+        
+    return result
     
     def get_upcoming_arrivals(self, hours: int = 48) -> List[Dict]:
         """Get vessels arriving in next N hours"""

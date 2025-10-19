@@ -228,9 +228,86 @@ def init_data_source():
         st.error(f"Error loading data: {e}")
         return None
 
+def show_login_page():
+    """
+    Display login page
+    """
+    from security.auth import AuthManager
+    
+    st.set_page_config(
+        page_title="Login - PSA Global Insights",
+        page_icon="🔐",
+        layout="centered"
+    )
+    
+    # Center the login form
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col2:
+        st.title("🚢 PSA Global Insights")
+        st.subheader("Please log in to continue")
+        
+        # Login form
+        with st.form("login_form"):
+            username = st.text_input("Username", placeholder="Enter your username")
+            password = st.text_input("Password", type="password", placeholder="Enter your password")
+            submit = st.form_submit_button("Login", use_container_width=True, type="primary")
+            
+            if submit:
+                if not username or not password:
+                    st.error("Please enter both username and password")
+                else:
+                    # Attempt login
+                    auth = AuthManager()
+                    success, message, user_info = auth.login(username, password)
+                    
+                    if success:
+                        st.success(message)
+                        st.rerun()  # Reload page to show main app
+                    else:
+                        st.error(message)
+        
+        # Help text
+        st.divider()
+        st.caption("🔒 Your connection is secure")
+        
+        # Temporary: Show test credentials (REMOVE IN PRODUCTION!)
+        with st.expander("📝 Test Credentials (Development Only)"):
+            st.info("""
+            **Admin Account:**
+            - Username: `admin`
+            - Password: `admin123`
+            
+            **Operations User:**
+            - Username: `operations_user`
+            - Password: `ops123`
+            
+            **Viewer:**
+            - Username: `viewer`
+            - Password: `view123`
+            
+            ⚠️ **IMPORTANT:** Change these passwords in production!
+            """)
+
 def main():
     """Main application entry point"""
     
+    # ✅ ADD: Check if user needs to log in
+    from security.auth import AuthManager
+    from security.session_manager import validate_session
+    
+    auth = AuthManager()
+    
+    # Check if user is authenticated
+    if not auth.is_authenticated():
+        # Show login page
+        show_login_page()
+        return  # Stop here until logged in
+    
+    # Validate session (check timeouts)
+    validate_session()
+    
+    # Original code continues
     chat_overlay()
 
     # Load custom CSS
