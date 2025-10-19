@@ -80,11 +80,6 @@ def create_berth_status_grid():
         {'id': 'B16', 'status': 'Available', 'terminal': 'T4', 'vessel': None},
     ]
     
-    # Create grid layout
-    html = """
-    <div style='display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin: 1rem 0;'>
-    """
-    
     status_colors = {
         'Available': '#06D6A0',
         'Occupied': '#EF476F',
@@ -97,30 +92,29 @@ def create_berth_status_grid():
         'Maintenance': '🔧'
     }
     
-    for berth in berths:
+    # Create 4 columns for grid layout
+    cols = st.columns(4)
+    
+    for idx, berth in enumerate(berths):
+        col_idx = idx % 4  # Which column (0-3)
         color = status_colors[berth['status']]
         icon = status_icons[berth['status']]
-        vessel_info = f"<div style='font-size: 0.75rem; color: #A0A0A0; margin-top: 0.25rem;'>{berth['vessel']}</div>" if berth['vessel'] else ""
         
-        html += f"""
-        <div style='background: rgba(0, 0, 0, 0.3); 
-                    padding: 1rem; 
-                    border-radius: 8px; 
-                    border-left: 4px solid {color};
-                    transition: transform 0.2s;'
-             onmouseover='this.style.transform="translateY(-2px)"'
-             onmouseout='this.style.transform="translateY(0)"'>
-            <div style='font-size: 0.7rem; color: #A0A0A0;'>{berth['terminal']}</div>
-            <div style='font-size: 1.2rem; font-weight: 700; color: white; margin: 0.25rem 0;'>{berth['id']}</div>
-            <div style='font-size: 0.85rem; color: {color};'>{icon} {berth['status']}</div>
-            {vessel_info}
-        </div>
-        """
-    
-    html += "</div>"
-    
-    st.markdown(html, unsafe_allow_html=True)
-
+        with cols[col_idx]:
+            vessel_info = f"<div style='font-size: 0.75rem; color: #A0A0A0; margin-top: 0.25rem;'>{berth['vessel']}</div>" if berth['vessel'] else ""
+            
+            st.markdown(f"""
+                <div style='background: rgba(0, 0, 0, 0.3); 
+                            padding: 1rem; 
+                            border-radius: 8px; 
+                            border-left: 4px solid {color};
+                            margin-bottom: 1rem;'>
+                    <div style='font-size: 0.7rem; color: #A0A0A0;'>{berth['terminal']}</div>
+                    <div style='font-size: 1.2rem; font-weight: 700; color: white; margin: 0.25rem 0;'>{berth['id']}</div>
+                    <div style='font-size: 0.85rem; color: {color};'>{icon} {berth['status']}</div>
+                    {vessel_info}
+                </div>
+            """, unsafe_allow_html=True)
 
 def create_berth_gantt_chart():
     """Create Gantt chart for berth schedule"""
