@@ -129,7 +129,7 @@ class PDFDataLoader:
         """Create separate vessels dataframe for vessel lookups"""
         if 'vessel_name' in self.df.columns and 'imo_number' in self.df.columns:
             self.vessels_df = self.df[['vessel_name', 'imo_number', 'operator', 'service']].drop_duplicates()
-    
+
     def _create_sample_data(self):
         """Create sample data if PDF loading fails"""
         logger.warning("📦 Using sample data")
@@ -196,14 +196,19 @@ class PDFDataLoader:
             return self.df.head(limit).to_dict('records')
         return []
     
+    def _convert_yes_no_to_percentage(self, column_name: str) -> float:
+        """Convert Y/N column to percentage"""
+        if column_name in self.df.columns:
+            return (self.df[column_name] == 'Y').sum() / len(self.df) * 100
+        return 0.0
+
     def get_current_metrics(self) -> Dict:
         """Get current performance metrics"""
         if self.df is None or self.df.empty:
             return {}
         
         metrics = {
-            'avg_arrival_accuracy': self.df['arrival_accuracy_final_btr'].mean() if 'arrival_accuracy_final_btr' in self.df.columns else 92.5,
-            'avg_wait_time': self.df['wait_time_atb_btr'].mean() if 'wait_time_atb_btr' in self.df.columns else 5.0,
+            'avg_arrival_accuracy': (self.df['arrival_accuracy_final_btr'] == 'Y').mean() * 100 if 'arrival_accuracy_final_btr' in self.df.columns else 92.5,            'avg_wait_time': self.df['wait_time_atb_btr'].mean() if 'wait_time_atb_btr' in self.df.columns else 5.0,
             'total_carbon_saved': self.df['carbon_abatement_tonnes'].sum() if 'carbon_abatement_tonnes' in self.df.columns else 2.5,
             'total_bunker_saved': self.df['bunker_saved_usd'].sum() if 'bunker_saved_usd' in self.df.columns else 200000,
             'total_movements': len(self.df)
