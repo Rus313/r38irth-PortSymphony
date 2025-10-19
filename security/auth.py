@@ -117,7 +117,7 @@ class AuthManager:
         # Create session token
         token = self._create_token(username, user['role'], user['department'])
         
-        # Store in session
+        # Store in session - FIXED: Make sure login_time is set
         st.session_state.authenticated = True
         st.session_state.username = username
         st.session_state.user_role = user['role']
@@ -125,13 +125,17 @@ class AuthManager:
         st.session_state.auth_token = token
         st.session_state.login_time = datetime.now()
         
+        # ✅ ADD: Initialize session tracking
+        st.session_state.session_created = datetime.now()
+        st.session_state.last_activity = datetime.now()
+        
         logger.info(f"Successful login: {username}")
         return True, "✅ Login successful!", {
             'username': username,
             'role': user['role'],
             'department': user['department']
         }
-    
+
     def logout(self):
         """
         Log out the current user

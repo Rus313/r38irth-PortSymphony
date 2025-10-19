@@ -32,12 +32,20 @@ class DataEncryption:
         # Try to get from Streamlit secrets
         if hasattr(st, 'secrets') and 'ENCRYPTION_KEY' in st.secrets:
             key_string = st.secrets['ENCRYPTION_KEY']
-            return base64.urlsafe_b64decode(key_string.encode())
+            # Key should already be a valid Fernet key string
+            try:
+                # If it's already base64 encoded, just encode to bytes
+                return key_string.encode() if isinstance(key_string, str) else key_string
+            except Exception as e:
+                logger.error(f"Error decoding encryption key from secrets: {e}")
         
         # Try to get from environment variable
         key_env = os.getenv('ENCRYPTION_KEY')
         if key_env:
-            return base64.urlsafe_b64decode(key_env.encode())
+            try:
+                return key_env.encode()
+            except Exception as e:
+                logger.error(f"Error decoding encryption key from env: {e}")
         
         # Generate a new key (WARNING: This will change on restart!)
         logger.warning("No encryption key found. Generating new key (will change on restart!)")
@@ -84,13 +92,16 @@ class DataEncryption:
             raise
 
 
-# Quick helper functions
-_encryptor = DataEncryption()
+# REMOVED: Don't create instance at module level
+# _encryptor = DataEncryption()  # <-- THIS WAS THE PROBLEM!
 
+# Quick helper functions - create instance when needed
 def encrypt_api_key(api_key: str) -> str:
     """Encrypt an API key"""
-    return _encryptor.encrypt(api_key)
+    encryptor = DataEncryption()
+    return encryptor.encrypt(api_key)
 
 def decrypt_api_key(encrypted_key: str) -> str:
     """Decrypt an API key"""
-    return _encryptor.decrypt(encrypted_key)
+    encryptor = DataEncryption()
+    return encryptor.decrypt(encrypted_key)

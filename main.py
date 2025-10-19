@@ -22,7 +22,9 @@ from frontend.pages import (
     berth_management
 )
 
-# Page configuration
+# ============================================
+# PAGE CONFIGURATION - MUST BE FIRST!
+# ============================================
 st.set_page_config(
     page_title=PageConfig.PAGE_TITLE,
     page_icon=PageConfig.PAGE_ICON,
@@ -114,75 +116,6 @@ def load_custom_css():
             border-right: 1px solid rgba(255, 255, 255, 0.1);
         }
         
-        /* Tab styling */
-        .stTabs [data-baseweb="tab-list"] {
-            gap: 8px;
-            background-color: transparent;
-        }
-        
-        .stTabs [data-baseweb="tab"] {
-            background-color: var(--card-bg);
-            border-radius: 8px;
-            padding: 0.75rem 1.5rem;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            color: #A0A0A0;
-            font-weight: 600;
-        }
-        
-        .stTabs [aria-selected="true"] {
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            color: white;
-            border: none;
-        }
-        
-        /* Expander styling */
-        .streamlit-expanderHeader {
-            background-color: var(--card-bg);
-            border-radius: 8px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            font-weight: 600;
-        }
-        
-        /* Dataframe styling */
-        .stDataFrame {
-            border-radius: 8px;
-            overflow: hidden;
-        }
-        
-        /* Input styling */
-        .stTextInput input, .stSelectbox select {
-            background-color: var(--card-bg);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 8px;
-            color: white;
-            padding: 0.75rem;
-        }
-        
-        /* Alert styling */
-        .stAlert {
-            border-radius: 8px;
-            border: none;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-        }
-        
-        /* Success alert */
-        .stAlert[data-baseweb="notification"] {
-            background-color: rgba(6, 214, 160, 0.1);
-            border-left: 4px solid var(--success-color);
-        }
-        
-        /* Info alert */
-        .stInfo {
-            background-color: rgba(0, 180, 216, 0.1);
-            border-left: 4px solid var(--secondary-color);
-        }
-        
-        /* Warning alert */
-        .stWarning {
-            background-color: rgba(255, 214, 10, 0.1);
-            border-left: 4px solid var(--warning-color);
-        }
-        
         /* Hide Streamlit branding */
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
@@ -190,11 +123,6 @@ def load_custom_css():
         /* Smooth scrolling */
         html {
             scroll-behavior: smooth;
-        }
-        
-        /* Loading spinner */
-        .stSpinner > div {
-            border-color: var(--secondary-color) transparent transparent transparent;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -234,11 +162,7 @@ def show_login_page():
     """
     from security.auth import AuthManager
     
-    st.set_page_config(
-        page_title="Login - PSA Global Insights",
-        page_icon="🔐",
-        layout="centered"
-    )
+    # DON'T call st.set_page_config() here - it's already called at the top!
     
     # Center the login form
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -292,7 +216,7 @@ def show_login_page():
 def main():
     """Main application entry point"""
     
-    # ✅ ADD: Check if user needs to log in
+    # Check if user needs to log in
     from security.auth import AuthManager
     from security.session_manager import validate_session
     

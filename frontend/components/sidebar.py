@@ -175,7 +175,11 @@ def render_sidebar() -> str:
             </div>
         """, unsafe_allow_html=True)
         
-st.divider()
+        st.divider()  # ← MOVED INSIDE (this was at line 179, outside the block)
+        
+        st.caption(f"Last updated: {datetime.now().strftime('%H:%M:%S')}")
+        
+        st.divider()
         
         # ✅ ADD: User info and logout
         from security.auth import AuthManager
@@ -197,19 +201,24 @@ st.divider()
                 </div>
             """, unsafe_allow_html=True)
             
-            # Session info
+            # Session info - with None checks
             if session_info:
                 with st.expander("⏱️ Session Info"):
-                    st.caption(f"Logged in: {session_info['logged_in_since'].strftime('%H:%M:%S')}")
-                    st.caption(f"Session expires in: {session_info['session_expires_in']}")
-                    st.caption(f"Idle timeout in: {session_info['idle_expires_in']}")
+                    # Check if logged_in_since exists and is not None
+                    if session_info.get('logged_in_since'):
+                        st.caption(f"Logged in: {session_info['logged_in_since'].strftime('%H:%M:%S')}")
+                    
+                    # Check if other fields exist
+                    if session_info.get('session_expires_in'):
+                        st.caption(f"Session expires in: {session_info['session_expires_in']}")
+                    
+                    if session_info.get('idle_expires_in'):
+                        st.caption(f"Idle timeout in: {session_info['idle_expires_in']}")
             
             # Logout button
             if st.button("🚪 Logout", use_container_width=True, type="secondary"):
                 auth.logout()
                 st.success("Logged out successfully")
                 st.rerun()
-        
-        st.caption(f"Last updated: {datetime.now().strftime('%H:%M:%S')}")
     
     return st.session_state.current_page
