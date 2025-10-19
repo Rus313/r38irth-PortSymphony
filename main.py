@@ -6,6 +6,7 @@ Frontend Implementation by Senior Frontend Engineer
 import streamlit as st
 from pathlib import Path
 import sys
+from frontend.components.chat_overlay import chat_overlay
 
 # Add project root to path
 sys.path.append(str(Path(__file__).parent))
@@ -230,6 +231,8 @@ def init_data_source():
 def main():
     """Main application entry point"""
     
+    chat_overlay()
+
     # Load custom CSS
     load_custom_css()
     

@@ -1,137 +1,120 @@
 import streamlit as st
-import requests
-import sys
-import os
+from backend.ai_service import MultiModelAIService, AzureOpenAIConfig
 
-# Ensure configkeys can be imported from root
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-if PROJECT_ROOT not in sys.path:
-    sys.path.append(PROJECT_ROOT)
+# -------------------------
+# Initialize AI service
+# -------------------------
+@st.cache_resource
+def init_backend():
+    config = AzureOpenAIConfig()
+    ai_service = MultiModelAIService(config)
+    return ai_service
 
-import configkeys
+ai_service = init_backend()
 
+# -------------------------
+# Collapsible Right-Column Chat (with duplication fix)
+# -------------------------
 def chat_overlay():
-    """
-    Fully floating bottom-right chatbot overlay using HTML/CSS.
-    All messages and input are inside the overlay.
-    """
-
-    if "chat_open" not in st.session_state:
-        st.session_state.chat_open = False
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
+    if "chat_open" not in st.session_state:
+        st.session_state.chat_open = True
+    if "last_user_input" not in st.session_state:
+        st.session_state.last_user_input = ""
 
-    # Toggle button for overlay
-    toggle_text = "💬 Chat" if not st.session_state.chat_open else "❌ Close Chat"
-    if st.button(toggle_text):
-        st.session_state.chat_open = not st.session_state.chat_open
+    col_main, col_chat = st.columns([4, 1])
 
-    if st.session_state.chat_open:
-        # Overlay HTML
-        overlay_html = """
-        <div class="chat-overlay">
-            <div class="chat-messages" id="chat-messages">
-        """
+    with col_chat:
+        # Toggle button
+        toggle_text = "💬" if not st.session_state.chat_open else "❌"
+        if st.button(toggle_text, key="chat_toggle"):
+            st.session_state.chat_open = not st.session_state.chat_open
 
-        # Render chat messages
-        for msg in st.session_state.chat_history:
-            if msg["role"] == "user":
-                overlay_html += f'''
-                <div style="
-                    background-color:#DCF8C6;
-                    padding:8px;
-                    border-radius:10px;
-                    margin:5px;
-                    text-align:right;
-                    max-width:80%;
-                    clear:both;
-                    float:right;">
-                    {msg["content"]}
-                </div>
-                '''
-            elif msg["role"] == "assistant":
-                overlay_html += f'''
-                <div style="
-                    background-color:#F1F0F0;
-                    padding:8px;
-                    border-radius:10px;
-                    margin:5px;
-                    text-align:left;
-                    max-width:80%;
-                    clear:both;
-                    float:left;">
-                    {msg["content"]}
-                </div>
-                '''
-            else:
-                overlay_html += f'<div style="color:red;">{msg["content"]}</div>'
+        if st.session_state.chat_open:
+            st.markdown("""
+            <style>
+            .chat-container {
+                max-height: 80vh;
+                overflow-y: auto;
+                padding: 10px;
+                background-color: #1E1E1E;
+                border-radius: 12px;
+            }
+            .chat-messages { display: flex; flex-direction: column; }
+            .user-bubble, .bot-bubble {
+                display: flex;
+                align-items: flex-start;
+                margin: 4px 0;
+                max-width: 90%;
+                word-wrap: break-word;
+            }
+            .user-bubble { justify-content: flex-end; align-self: flex-end; }
+            .bot-bubble { justify-content: flex-start; align-self: flex-start; }
+            .bubble-content {
+                padding: 10px 14px;
+                border-radius: 18px;
+                font-size: 14px;
+                line-height: 1.4;
+            }
+            .user-bubble .bubble-content {
+                background-color: #0B93F6;
+                color: white;
+                border-radius: 18px 18px 0 18px;
+            }
+            .bot-bubble .bubble-content {
+                background-color: #2C2C2C;
+                color: white;
+                border-radius: 18px 18px 18px 0;
+            }
+            .avatar { width: 28px; height: 28px; border-radius: 50%; margin: 0 8px; }
+            .chat-input {
+                border-radius: 20px;
+                border: 1px solid #444;
+                background-color: #2C2C2C;
+                color: white;
+                padding: 8px 14px;
+                width: 100%;
+                margin-top: 8px;
+            }
+            </style>
+            """, unsafe_allow_html=True)
 
-        overlay_html += """
-            </div>
-            <form action="" method="post">
-                <input type="text" name="user_input" id="user_input" placeholder="Type a message..." 
-                    style="width:80%; padding:5px; border-radius:5px; border:1px solid #ccc;">
-                <input type="submit" value="Send" 
-                    style="padding:5px 10px; border-radius:5px; background-color:#007bff; color:white; border:none;">
-            </form>
-        </div>
-        """
+            st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+            st.markdown('<div class="chat-messages">', unsafe_allow_html=True)
 
-        # Overlay CSS
-        st.markdown("""
-        <style>
-        .chat-overlay {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            width: 350px;
-            max-height: 500px;
-            background-color: white;
-            border: 1px solid #ccc;
-            border-radius: 10px;
-            box-shadow: 0px 4px 12px rgba(0,0,0,0.15);
-            padding: 10px;
-            z-index: 9999;
-            overflow: hidden;
-        }
-        .chat-messages {
-            max-height: 400px;
-            overflow-y: auto;
-            margin-bottom: 10px;
-        }
-        </style>
-        """, unsafe_allow_html=True)
+            # Display messages
+            for msg in st.session_state.chat_history:
+                if msg["role"] == "user":
+                    st.markdown(f"""
+                    <div class="user-bubble">
+                        <div class="bubble-content">{msg['content']}</div>
+                        <img class="avatar" src="https://i.imgur.com/2yaf2wb.png" alt="user">
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.markdown(f"""
+                    <div class="bot-bubble">
+                        <img class="avatar" src="https://i.imgur.com/q5tK3tB.png" alt="bot">
+                        <div class="bubble-content">{msg['content']}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
 
-        # Render overlay HTML
-        st.markdown(overlay_html, unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)  # close messages
 
-        # Handle form submission
-        submitted_input = st.experimental_get_query_params().get("user_input", [""])[0]
-        if submitted_input:
-            user_message = submitted_input.strip()
-            if user_message:
-                st.session_state.chat_history.append({"role": "user", "content": user_message})
+            # Input for new message
+            user_input = st.text_input("Type a message...", key="chat_input")
 
-                # Call Azure OpenAI
-                url = f"{configkeys.AZURE_OPENAI_ENDPOINT}openai/deployments/{configkeys.DEPLOYMENT_ID}/chat/completions?api-version={configkeys.AZURE_OPENAI_API_VERSION}"
-                headers = {"Content-Type": "application/json", "api-key": configkeys.AZURE_OPENAI_API_KEY}
-                payload = {"messages": st.session_state.chat_history, "temperature": 0.7}
+            if user_input and user_input != st.session_state.last_user_input:
+                # Prevent duplicate responses
+                st.session_state.last_user_input = user_input
 
-                try:
-                    response = requests.post(url, headers=headers, json=payload)
-                    response.raise_for_status()
-                    data = response.json()
-                    ai_message = data["choices"][0]["message"]["content"]
+                # Append user message
+                st.session_state.chat_history.append({"role": "user", "content": user_input})
+                # Get AI response
+                ai_response = ai_service.chat(user_input, st.session_state.chat_history)
+                st.session_state.chat_history.append({"role": "assistant", "content": ai_response})
 
-                    st.session_state.chat_history.append({"role": "assistant", "content": ai_message})
+                st.experimental_rerun()
 
-                except Exception as e:
-                    st.session_state.chat_history.append({"role": "system", "content": f"❌ Error: {e}"})
-
-        # Auto-scroll JS
-        st.markdown("""
-        <script>
-        var chatContainer = window.document.getElementsByClassName('chat-messages')[0];
-        if (chatContainer) { chatContainer.scrollTop = chatContainer.scrollHeight; }
-        </script>
-        """, unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)  # close container
