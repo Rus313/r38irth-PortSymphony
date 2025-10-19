@@ -133,7 +133,6 @@ def create_carbon_trend_chart():
             titlefont=dict(color=colors.SUCCESS),
             tickfont=dict(color=colors.SUCCESS)
         ),
-        hovermode='x unified',
         legend=dict(
             orientation='h',
             yanchor='bottom',

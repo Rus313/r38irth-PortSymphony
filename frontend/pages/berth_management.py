@@ -291,7 +291,6 @@ def create_utilization_trend():
         xaxis_title='Date',
         yaxis_title='Utilization (%)',
         yaxis=dict(range=[50, 95]),
-        hovermode='x unified',
         legend=dict(
             orientation='h',
             yanchor='bottom',

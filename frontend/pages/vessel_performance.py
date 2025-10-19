@@ -184,7 +184,6 @@ def create_arrival_accuracy_trend():
         xaxis_title='Date',
         yaxis_title='Accuracy (%)',
         yaxis=dict(range=[75, 105]),
-        hovermode='x unified',
         legend=dict(
             orientation='h',
             yanchor='bottom',

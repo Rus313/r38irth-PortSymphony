@@ -149,7 +149,6 @@ def create_performance_chart():
             xanchor='right',
             x=1
         ),
-        hovermode='x unified'
     )
     
     return fig
