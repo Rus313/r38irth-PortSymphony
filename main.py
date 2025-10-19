@@ -4,6 +4,17 @@ Frontend Implementation by Senior Frontend Engineer
 """
 
 import streamlit as st
+from frontend.config import PageConfig
+
+# Page configuration
+st.set_page_config(
+    page_title=PageConfig.PAGE_TITLE,
+    page_icon=PageConfig.PAGE_ICON,
+    layout=PageConfig.LAYOUT,
+    initial_sidebar_state=PageConfig.SIDEBAR_STATE
+)
+
+
 from pathlib import Path
 import sys
 from frontend.components.chat_overlay import chat_overlay
@@ -12,22 +23,14 @@ from frontend.components.chat_overlay import chat_overlay
 sys.path.append(str(Path(__file__).parent))
 
 from data.pdf_loader import get_data_loader
-from frontend.config import PageConfig
 from frontend.components.sidebar import render_sidebar
 from frontend.components.header import render_header
 from frontend.pages import (
     global_insights,
     vessel_performance,
     sustainability,
-    berth_management
-)
-
-# Page configuration
-st.set_page_config(
-    page_title=PageConfig.PAGE_TITLE,
-    page_icon=PageConfig.PAGE_ICON,
-    layout=PageConfig.LAYOUT,
-    initial_sidebar_state=PageConfig.SIDEBAR_STATE
+    berth_management,
+    ai_chatbot
 )
 
 # Custom CSS for enhanced UI/UX
@@ -230,8 +233,6 @@ def init_data_source():
 
 def main():
     """Main application entry point"""
-    
-    chat_overlay()
 
     # Load custom CSS
     load_custom_css()
@@ -255,7 +256,8 @@ def main():
         'Global Insights': global_insights.render,
         'Vessel Performance': vessel_performance.render,
         'Sustainability': sustainability.render,
-        'Berth Management': berth_management.render
+        'Berth Management': berth_management.render,
+        'AI Chatbot': ai_chatbot.render
     }
     
     # Render selected page

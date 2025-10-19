@@ -1,12 +1,23 @@
 import streamlit as st
-import requests
-import configkeys  # your config file
+from backend.ai_service import MultiModelAIService, AzureOpenAIConfig
 
-st.set_page_config(page_title="PSA Hackathon AI Chat", page_icon="🛳️")
+# st.set_page_config(page_title="PSA Hackathon AI Chat", page_icon="🛳️")
+# st.title("PSA Hackathon AI Chat 🛳️")
 
-st.title("PSA Hackathon AI Chat 🛳️")
+# -------------------------
+# Initialize AI service
+# -------------------------
+@st.cache_resource
+def init_backend():
+    config = AzureOpenAIConfig()
+    ai_service = MultiModelAIService(config)
+    return ai_service
 
-# Initialize chat history
+ai_service = init_backend()
+
+# -------------------------
+# Chat history
+# -------------------------
 if "history" not in st.session_state:
     st.session_state.history = []
 
@@ -27,25 +38,22 @@ for msg in st.session_state.history:
 user_input = st.chat_input("Type your message here...")
 
 if user_input:
-    # Add user message to history
-    st.session_state.history.append({"role": "user", "content": user_input})
-    st.chat_message("user").write(user_input)
+    # Prevent duplicate AI response on rerun
+    if "last_user_input" not in st.session_state:
+        st.session_state.last_user_input = ""
 
-    # Prepare REST API request
-    url = f"{configkeys.AZURE_OPENAI_ENDPOINT}openai/deployments/{configkeys.DEPLOYMENT_ID}/chat/completions?api-version={configkeys.AZURE_OPENAI_API_VERSION}"
-    headers = {"Content-Type": "application/json", "api-key": configkeys.AZURE_OPENAI_API_KEY}
-    payload = {"messages": st.session_state.history, "temperature": 0.7}
+    if user_input != st.session_state.last_user_input:
+        st.session_state.last_user_input = user_input
 
-    try:
-        response = requests.post(url, headers=headers, json=payload)
-        response.raise_for_status()
-        data = response.json()
-        ai_message = data["choices"][0]["message"]["content"]
+        # Add user message
+        st.session_state.history.append({"role": "user", "content": user_input})
+        st.chat_message("user").write(user_input)
 
-        # Add AI response to history
-        st.session_state.history.append({"role": "assistant", "content": ai_message})
-        st.chat_message("assistant").write(ai_message)
-
-    except Exception as e:
-        st.session_state.history.append({"role": "system", "content": f"❌ Error: {e}"})
-        st.markdown(f"<span style='color:red'>❌ Error: {e}</span>", unsafe_allow_html=True)
+        # Get AI response from your service
+        try:
+            ai_response = ai_service.chat(user_input, st.session_state.history)
+            st.session_state.history.append({"role": "assistant", "content": ai_response})
+            st.chat_message("assistant").write(ai_response)
+        except Exception as e:
+            st.session_state.history.append({"role": "system", "content": f"❌ Error: {e}"})
+            st.markdown(f"<span style='color:red'>❌ Error: {e}</span>", unsafe_allow_html=True)

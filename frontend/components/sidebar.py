@@ -56,7 +56,8 @@ def render_sidebar() -> str:
             ('Global Insights', '🌍'),
             ('Vessel Performance', '🚢'),
             ('Sustainability', '🌱'),
-            ('Berth Management', '⚓')
+            ('Berth Management', '⚓'),
+            ('AI Chatbot', '💬')
         ]
         
         # Create navigation buttons
