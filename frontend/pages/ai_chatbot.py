@@ -88,7 +88,7 @@ def render():
         st.session_state.pending_query = "How is our overall performance? Any concerns?"
     
     if st.sidebar.button("🔥 Critical Issues", use_container_width=True):
-        st.session_query = "What are the most critical issues I need to address immediately?"
+        st.session_state.pending_query = "What are the most critical issues I need to address immediately?"
     
     if st.sidebar.button("⚓ Berth Status", use_container_width=True):
         st.session_state.pending_query = "Show me the current status of all berths."
@@ -149,12 +149,16 @@ def render():
     # User input
     # -------------------------
     
-    # Handle pending query from quick actions
+    # Always show chat input
+    chatbox_input = st.chat_input("Ask me anything about the dashboard...")
+
+    # Determine which input to process this run
+    user_input = None
     if st.session_state.get('pending_query'):
         user_input = st.session_state.pending_query
         st.session_state.pending_query = None
-    else:
-        user_input = st.chat_input("Ask me anything about the dashboard...")
+    elif chatbox_input:
+        user_input = chatbox_input
     
     if user_input:
         # Append user message
@@ -198,6 +202,8 @@ def render():
                     st.error(error_msg)
                     st.session_state.history.append({"role": "system", "content": error_msg})
         
+        # # 🩹 Fix: clear pending query BEFORE rerun
+        # st.session_state.pending_query = None
         # st.rerun()
     
     # -------------------------
