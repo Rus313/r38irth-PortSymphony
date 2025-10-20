@@ -231,9 +231,6 @@ def main():
     
     # Validate session (check timeouts)
     validate_session()
-    
-    # Original code continues
-    chat_overlay()
 
     # Load custom CSS
     load_custom_css()
