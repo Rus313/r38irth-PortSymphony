@@ -267,6 +267,14 @@ def main():
     from security.auth import AuthManager
     from security.session_manager import validate_session
     
+    # -------------------------
+    # Handle AI Chat Popup (via iframe page)
+    # -------------------------
+    query_params = st.experimental_get_query_params()
+    if query_params.get("page") == ["ai_chat_popup"]:
+        ai_chatbot.render()
+        return
+
     auth = AuthManager()
     
     # Check if user is authenticated
@@ -295,14 +303,6 @@ def main():
     # Render sidebar and get selected page
     selected_page = render_sidebar()
 
-    # -------------------------
-    # Handle AI Chat Popup (via iframe page)
-    # -------------------------
-    query_params = st.experimental_get_query_params()
-    if query_params.get("page") == ["ai_chat_popup"]:
-        ai_chatbot.render()
-        return
-
     # Normal routing
     page_routing = {
         'Global Insights': global_insights.render,
@@ -320,19 +320,13 @@ def main():
     # -------------------------
     # Floating Chat Button
     # -------------------------
-    # Show button only if not on dedicated AI Chatbot page
-    if selected_page != 'AI Chatbot':
-        # Toggle popup via Streamlit button
-        if st.button("🤖", key="open_chat_button"):
-            st.session_state.show_chat_popup = not st.session_state.show_chat_popup
-
-        # Render popup
-        if st.session_state.show_chat_popup:
-            st.markdown("""
-            <div class="chat-popup">
-                <iframe src="?page=ai_chat_popup"></iframe>
-            </div>
-            """, unsafe_allow_html=True)
+    # Chat popup logic (controlled by header button)
+    if st.session_state.get("show_chat_popup", False):
+        st.markdown("""
+        <div class="chat-popup">
+            <iframe src="?page=ai_chat_popup"></iframe>
+        </div>
+        """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
