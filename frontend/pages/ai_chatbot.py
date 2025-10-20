@@ -6,20 +6,36 @@ Uses DashboardAgent with function calling and domain expertise
 import streamlit as st
 from backend.dashboard_agent import DashboardAgent
 from backend.dashboard_data_access import DashboardDataAccess
-from data.pdf_loader import get_data_loader
+import logging
+
+logger = logging.getLogger(__name__)
 
 # -------------------------
 # Initialize Smart Agent
 # -------------------------
 @st.cache_resource
-def init_smart_agent():
-    """Initialize the smart dashboard agent with domain expertise"""
-    db = get_data_loader()
-    data_access = DashboardDataAccess(db)
+def init_smart_agent(use_demo=True):
+    """
+    Initialize the smart dashboard agent with domain expertise
+    
+    Args:
+        use_demo: If True, use demo dataset; if False, use real PDF data
+    """
+    if use_demo:
+        from data.demo_dataset import get_demo_dataset
+        db = get_demo_dataset()
+        logger.info("🎭 AI Chatbot using DEMO dataset")
+    else:
+        from data.pdf_loader import get_data_loader
+        db = get_data_loader()
+        logger.info("📄 AI Chatbot using REAL PDF data")
+    
+    data_access = DashboardDataAccess(db, use_demo=use_demo)
     agent = DashboardAgent(data_access)
     return agent
 
-agent = init_smart_agent()
+# ✅ Set to True to use demo data (matches dashboard)
+agent = init_smart_agent(use_demo=True)
 
 # -------------------------
 # Render AI Chat Page

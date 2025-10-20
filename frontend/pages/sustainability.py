@@ -11,17 +11,23 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 from frontend.config import colors, charts
+from data.demo_dataset import get_demo_dataset  # ✅ Import demo dataset
 
 
 def create_carbon_kpis():
     """Create carbon-focused KPI metrics"""
+    
+    # ✅ Use demo dataset
+    demo = get_demo_dataset()
+    carbon_summary = demo.get_carbon_summary()
+    total_saved = carbon_summary['total_savings']
     
     col1, col2, col3, col4, col5 = st.columns(5)
     
     with col1:
         st.metric(
             label="🌱 Total Carbon Saved",
-            value="1,245 tonnes",
+            value=f"{total_saved:.0f} tonnes",
             delta="+285 tonnes",
             help="Total CO₂ emissions saved this month"
         )
@@ -43,10 +49,12 @@ def create_carbon_kpis():
         )
     
     with col4:
+        # Calculate trees equivalent (1 tonne CO2 = ~46.5 trees)
+        trees = int(total_saved * 46.5)
         st.metric(
             label="🌳 Trees Equivalent",
-            value="58,000",
-            delta="+13,200",
+            value=f"{trees:,}",
+            delta=f"+{int(285 * 46.5):,}",
             help="Equivalent trees planted for carbon offset"
         )
     
@@ -62,22 +70,16 @@ def create_carbon_kpis():
 def create_carbon_trend_chart():
     """Create carbon emissions trend chart"""
     
-    # Generate sample data
-    dates = pd.date_range(end=datetime.now(), periods=180, freq='D')
-    df = pd.DataFrame({
-        'Date': dates,
-        'Emissions': np.random.normal(850, 50, 180) - np.linspace(0, 150, 180),
-        'Baseline': [1000] * 180,
-        'Target': [750] * 180,
-        'Savings': np.random.normal(150, 20, 180) + np.linspace(0, 100, 180)
-    })
+    # ✅ Use demo dataset
+    demo = get_demo_dataset()
+    df = demo.carbon.tail(180)
     
     fig = go.Figure()
     
     # Baseline
     fig.add_trace(go.Scatter(
-        x=df['Date'],
-        y=df['Baseline'],
+        x=df['date'],
+        y=df['baseline'],
         name='Baseline',
         line=dict(color='rgba(255, 255, 255, 0.3)', width=2, dash='dot'),
         mode='lines'
@@ -85,8 +87,8 @@ def create_carbon_trend_chart():
     
     # Actual emissions
     fig.add_trace(go.Scatter(
-        x=df['Date'],
-        y=df['Emissions'],
+        x=df['date'],
+        y=df['total_emissions'],
         name='Actual Emissions',
         line=dict(color=colors.DANGER, width=3),
         fill='tonexty',
@@ -96,8 +98,8 @@ def create_carbon_trend_chart():
     
     # Target
     fig.add_trace(go.Scatter(
-        x=df['Date'],
-        y=df['Target'],
+        x=df['date'],
+        y=df['target'],
         name='Target',
         line=dict(color=colors.SUCCESS, width=2, dash='dash'),
         mode='lines'
@@ -105,8 +107,8 @@ def create_carbon_trend_chart():
     
     # Savings (on secondary axis)
     fig.add_trace(go.Scatter(
-        x=df['Date'],
-        y=df['Savings'],
+        x=df['date'],
+        y=df['carbon_saved'],
         name='Savings',
         line=dict(color=colors.SUCCESS, width=2),
         yaxis='y2',
@@ -148,38 +150,54 @@ def create_carbon_trend_chart():
 def create_vessel_emissions_breakdown():
     """Create vessel-by-vessel emissions breakdown"""
     
-    # Sample data
-    vessels = pd.DataFrame({
-        'Vessel': ['MSC Diana', 'Ever Given', 'CMA CGM Antoine', 'Maersk Essex', 
-                   'COSCO Shipping', 'Hapag-Lloyd Berlin', 'ONE Innovation', 'Others'],
-        'Emissions': [245, 312, 198, 276, 231, 189, 167, 587],
-        'Savings': [45, 38, 52, 41, 48, 55, 61, 123],
-        'Efficiency': [84.5, 79.2, 88.6, 82.1, 85.3, 89.7, 91.2, 81.4]
-    })
+    # ✅ Use demo dataset
+    demo = get_demo_dataset()
+    
+    # Get top vessels by carbon saved
+    carbon_data = demo.get_carbon_metrics(days=30)
+    carbon_df = pd.DataFrame(carbon_data)
+    
+    if not carbon_df.empty:
+        # Group by vessel and sum
+        vessel_summary = carbon_df.groupby('vessel_name').agg({
+            'total_emissions': 'sum',
+            'carbon_saved': 'sum'
+        }).reset_index()
+        
+        # Get top 8 vessels
+        vessel_summary = vessel_summary.nlargest(8, 'total_emissions')
+    else:
+        # Fallback data
+        vessel_summary = pd.DataFrame({
+            'vessel_name': ['MSC Diana', 'Ever Given', 'CMA CGM Antoine', 'Maersk Essex', 
+                           'COSCO Shipping', 'Hapag-Lloyd Berlin', 'ONE Innovation', 'Others'],
+            'total_emissions': [245, 312, 198, 276, 231, 189, 167, 587],
+            'carbon_saved': [45, 38, 52, 41, 48, 55, 61, 123]
+        })
     
     # Calculate percentage
-    vessels['Emissions_Pct'] = (vessels['Emissions'] / vessels['Emissions'].sum() * 100).round(1)
+    vessel_summary['emissions_pct'] = (vessel_summary['total_emissions'] / vessel_summary['total_emissions'].sum() * 100).round(1)
     
     fig = go.Figure()
     
     # Emissions bar
     fig.add_trace(go.Bar(
         name='Emissions',
-        x=vessels['Vessel'],
-        y=vessels['Emissions'],
+        x=vessel_summary['vessel_name'],
+        y=vessel_summary['total_emissions'],
         marker_color=colors.DANGER,
-        text=vessels['Emissions_Pct'].apply(lambda x: f'{x}%'),
+        text=vessel_summary['emissions_pct'].apply(lambda x: f'{x}%'),
         textposition='outside',
-        hovertemplate='<b>%{x}</b><br>Emissions: %{y} tonnes<br>%{text} of total<extra></extra>'
+        hovertemplate='<b>%{x}</b><br>Emissions: %{y:.0f} tonnes<br>%{text} of total<extra></extra>'
     ))
     
     # Savings bar
     fig.add_trace(go.Bar(
         name='Savings',
-        x=vessels['Vessel'],
-        y=vessels['Savings'],
+        x=vessel_summary['vessel_name'],
+        y=vessel_summary['carbon_saved'],
         marker_color=colors.SUCCESS,
-        hovertemplate='<b>%{x}</b><br>Savings: %{y} tonnes<extra></extra>'
+        hovertemplate='<b>%{x}</b><br>Savings: %{y:.0f} tonnes<extra></extra>'
     ))
     
     fig.update_layout(
@@ -289,7 +307,7 @@ def create_emissions_heatmap():
     return fig
 
 
-def create_efficiency_gauge(current_value: float, target: float):
+def create_efficiency_gauge(current_value: float = 85.3, target: float = 85):
     """Create gauge chart for carbon efficiency"""
     
     fig = go.Figure(go.Indicator(
@@ -328,7 +346,17 @@ def create_efficiency_gauge(current_value: float, target: float):
 def create_environmental_impact_card():
     """Create environmental impact equivalents card"""
     
-    st.markdown("""
+    # ✅ Use demo dataset
+    demo = get_demo_dataset()
+    total_saved = demo.get_carbon_summary()['total_savings']
+    
+    # Calculate equivalents
+    trees = int(total_saved * 46.5)
+    cars = int(total_saved / 4.6)
+    energy_kwh = int(total_saved * 116.5)
+    homes = int(total_saved / 7.5)
+    
+    st.markdown(f"""
         <div style='background: linear-gradient(135deg, rgba(6, 214, 160, 0.2), rgba(6, 214, 160, 0.1));
                     padding: 2rem;
                     border-radius: 12px;
@@ -337,62 +365,27 @@ def create_environmental_impact_card():
             <div style='display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem;'>
                 <div style='background: rgba(0, 0, 0, 0.3); padding: 1rem; border-radius: 8px;'>
                     <div style='font-size: 2rem; margin-bottom: 0.5rem;'>🌳</div>
-                    <div style='font-size: 1.5rem; font-weight: 700; color: white; margin-bottom: 0.25rem;'>58,000</div>
+                    <div style='font-size: 1.5rem; font-weight: 700; color: white; margin-bottom: 0.25rem;'>{trees:,}</div>
                     <div style='color: #A0A0A0; font-size: 0.9rem;'>Trees Planted Equivalent</div>
                 </div>
                 <div style='background: rgba(0, 0, 0, 0.3); padding: 1rem; border-radius: 8px;'>
                     <div style='font-size: 2rem; margin-bottom: 0.5rem;'>🚗</div>
-                    <div style='font-size: 1.5rem; font-weight: 700; color: white; margin-bottom: 0.25rem;'>270</div>
+                    <div style='font-size: 1.5rem; font-weight: 700; color: white; margin-bottom: 0.25rem;'>{cars}</div>
                     <div style='color: #A0A0A0; font-size: 0.9rem;'>Cars Off Road for 1 Year</div>
                 </div>
                 <div style='background: rgba(0, 0, 0, 0.3); padding: 1rem; border-radius: 8px;'>
                     <div style='font-size: 2rem; margin-bottom: 0.5rem;'>⚡</div>
-                    <div style='font-size: 1.5rem; font-weight: 700; color: white; margin-bottom: 0.25rem;'>145,000</div>
+                    <div style='font-size: 1.5rem; font-weight: 700; color: white; margin-bottom: 0.25rem;'>{energy_kwh:,}</div>
                     <div style='color: #A0A0A0; font-size: 0.9rem;'>kWh Energy Saved</div>
                 </div>
                 <div style='background: rgba(0, 0, 0, 0.3); padding: 1rem; border-radius: 8px;'>
                     <div style='font-size: 2rem; margin-bottom: 0.5rem;'>🏠</div>
-                    <div style='font-size: 1.5rem; font-weight: 700; color: white; margin-bottom: 0.25rem;'>62</div>
+                    <div style='font-size: 1.5rem; font-weight: 700; color: white; margin-bottom: 0.25rem;'>{homes}</div>
                     <div style='color: #A0A0A0; font-size: 0.9rem;'>Homes Powered for 1 Year</div>
                 </div>
             </div>
         </div>
     """, unsafe_allow_html=True)
-
-
-def create_optimization_opportunities_table():
-    """Create table of carbon optimization opportunities"""
-    
-    opportunities = pd.DataFrame({
-        'Opportunity': [
-            '🚢 Speed Optimization - MSC Diana',
-            '🗺️ Route Adjustment - Ever Given',
-            '⚓ Berth Scheduling - CMA CGM Antoine',
-            '🌤️ Weather Routing - Maersk Essex',
-            '⏱️ Idle Time Reduction - COSCO Shipping'
-        ],
-        'Potential Savings (tonnes)': [45.2, 38.7, 28.5, 32.1, 25.8],
-        'Cost Savings (USD)': ['$18,200', '$15,600', '$11,500', '$12,900', '$10,400'],
-        'Implementation': ['Easy', 'Medium', 'Easy', 'Medium', 'Easy'],
-        'Timeframe': ['Immediate', '2-3 days', 'Immediate', '1-2 days', 'Immediate'],
-        'Status': ['🟢 Ready', '🟡 Planning', '🟢 Ready', '🟡 Planning', '🟢 Ready']
-    })
-    
-    # Style implementation difficulty
-    def color_implementation(val):
-        if val == 'Easy':
-            return 'background-color: rgba(6, 214, 160, 0.2)'
-        elif val == 'Medium':
-            return 'background-color: rgba(255, 214, 10, 0.2)'
-        else:
-            return 'background-color: rgba(239, 71, 111, 0.2)'
-    
-    styled_df = opportunities.style.applymap(
-        color_implementation, 
-        subset=['Implementation']
-    )
-    
-    return styled_df
 
 
 def create_sustainability_score_breakdown():
@@ -451,10 +444,45 @@ def create_sustainability_score_breakdown():
     return fig
 
 
+def create_optimization_opportunities_table():
+    """Create table of carbon optimization opportunities"""
+    
+    opportunities = pd.DataFrame({
+        'Opportunity': [
+            '🚢 Speed Optimization - MSC Diana',
+            '🗺️ Route Adjustment - Ever Given',
+            '⚓ Berth Scheduling - CMA CGM Antoine',
+            '🌤️ Weather Routing - Maersk Essex',
+            '⏱️ Idle Time Reduction - COSCO Shipping'
+        ],
+        'Potential Savings (tonnes)': [45.2, 38.7, 28.5, 32.1, 25.8],
+        'Cost Savings (USD)': ['$18,200', '$15,600', '$11,500', '$12,900', '$10,400'],
+        'Implementation': ['Easy', 'Medium', 'Easy', 'Medium', 'Easy'],
+        'Timeframe': ['Immediate', '2-3 days', 'Immediate', '1-2 days', 'Immediate'],
+        'Status': ['🟢 Ready', '🟡 Planning', '🟢 Ready', '🟡 Planning', '🟢 Ready']
+    })
+    
+    # Style implementation difficulty
+    def color_implementation(val):
+        if val == 'Easy':
+            return 'background-color: rgba(6, 214, 160, 0.2)'
+        elif val == 'Medium':
+            return 'background-color: rgba(255, 214, 10, 0.2)'
+        else:
+            return 'background-color: rgba(239, 71, 111, 0.2)'
+    
+    styled_df = opportunities.style.applymap(
+        color_implementation, 
+        subset=['Implementation']
+    )
+    
+    return styled_df
+
+
 def render():
     """Render the Sustainability page"""
 
-     # ✅ ADD: Permission check
+    # ✅ Permission check
     from config.permissions import Permission, require_permission
     require_permission(Permission.VIEW_SUSTAINABILITY)
     

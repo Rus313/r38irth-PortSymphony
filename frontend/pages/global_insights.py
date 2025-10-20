@@ -10,6 +10,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 from frontend.config import colors, charts
+from data.demo_dataset import get_demo_dataset  # ✅ Import demo dataset
 
 def create_kpi_card(label: str, value: str, delta: str = None, icon: str = "📊"):
     """Create a KPI metric card"""
@@ -29,26 +30,23 @@ def create_kpi_card(label: str, value: str, delta: str = None, icon: str = "📊
 
 def create_port_map():
     """Create interactive port and vessel route map"""
-    # Sample port data
-    ports = pd.DataFrame({
-        'port': ['Singapore', 'Rotterdam', 'Shanghai', 'Los Angeles', 'Antwerp'],
-        'lat': [1.3521, 51.9225, 31.2304, 33.7701, 51.2194],
-        'lon': [103.8198, 4.47917, 121.4737, -118.1937, 4.4025],
-        'vessels': [45, 32, 38, 28, 25],
-        'country': ['Singapore', 'Netherlands', 'China', 'USA', 'Belgium']
-    })
+    # ✅ Use demo dataset
+    demo = get_demo_dataset()
+    ports = demo.ports
     
-    # Create figure
+    # Create vessel routes from recent movements
+    recent_moves = demo.movements.tail(4)
+    
     fig = go.Figure()
     
     # Add port markers
     fig.add_trace(go.Scattergeo(
-        lon=ports['lon'],
-        lat=ports['lat'],
-        text=ports['port'] + '<br>Vessels: ' + ports['vessels'].astype(str),
+        lon=ports['longitude'],
+        lat=ports['latitude'],
+        text=ports['port_name'] + '<br>Vessels: ' + ports['vessel_count'].astype(str),
         mode='markers+text',
         marker=dict(
-            size=ports['vessels'] / 2,
+            size=ports['vessel_count'] / 2,
             color=colors.SECONDARY,
             line=dict(width=2, color='white'),
             sizemode='diameter'
@@ -59,24 +57,24 @@ def create_port_map():
         hovertemplate='<b>%{text}</b><br>Lat: %{lat}<br>Lon: %{lon}<extra></extra>'
     ))
     
-    # Add sample routes
-    routes = [
-        {'from': 0, 'to': 1, 'color': colors.PRIMARY},
-        {'from': 0, 'to': 2, 'color': colors.SUCCESS},
-        {'from': 1, 'to': 3, 'color': colors.WARNING},
-        {'from': 2, 'to': 3, 'color': colors.DANGER}
-    ]
+    # Add sample routes (simplified - just showing concept)
+    route_colors = [colors.PRIMARY, colors.SUCCESS, colors.WARNING, colors.DANGER]
     
-    for route in routes:
-        fig.add_trace(go.Scattergeo(
-            lon=[ports.iloc[route['from']]['lon'], ports.iloc[route['to']]['lon']],
-            lat=[ports.iloc[route['from']]['lat'], ports.iloc[route['to']]['lat']],
-            mode='lines',
-            line=dict(width=2, color=route['color']),
-            opacity=0.6,
-            showlegend=False,
-            hoverinfo='skip'
-        ))
+    for i in range(min(4, len(recent_moves))):
+        move = recent_moves.iloc[i]
+        from_port = ports[ports['port_name'] == move['from_port']]
+        to_port = ports[ports['port_name'] == move['to_port']]
+        
+        if not from_port.empty and not to_port.empty:
+            fig.add_trace(go.Scattergeo(
+                lon=[from_port.iloc[0]['longitude'], to_port.iloc[0]['longitude']],
+                lat=[from_port.iloc[0]['latitude'], to_port.iloc[0]['latitude']],
+                mode='lines',
+                line=dict(width=2, color=route_colors[i % 4]),
+                opacity=0.6,
+                showlegend=False,
+                hoverinfo='skip'
+            ))
     
     # Update layout
     fig.update_layout(
@@ -105,30 +103,29 @@ def create_port_map():
 
 def create_performance_chart():
     """Create performance trend chart"""
-    # Generate sample data
-    dates = pd.date_range(end=datetime.now(), periods=30, freq='D')
-    df = pd.DataFrame({
-        'Date': dates,
-        'Arrival Accuracy': np.random.normal(85, 5, 30).clip(70, 100),
-        'Berth Utilization': np.random.normal(78, 4, 30).clip(60, 95),
-        'On-Time Performance': np.random.normal(82, 6, 30).clip(65, 98)
-    })
+    # ✅ Use demo dataset
+    demo = get_demo_dataset()
+    df = demo.performance.tail(30)
     
     fig = go.Figure()
     
-    metrics = ['Arrival Accuracy', 'Berth Utilization', 'On-Time Performance']
-    metric_colors = [colors.PRIMARY, colors.SUCCESS, colors.SECONDARY]
+    metrics = [
+        ('avg_arrival_accuracy', 'Arrival Accuracy', colors.PRIMARY),
+        ('berth_utilization', 'Berth Utilization', colors.SUCCESS),
+        ('on_time_performance', 'On-Time Performance', colors.SECONDARY)
+    ]
     
-    for metric, color in zip(metrics, metric_colors):
-        fig.add_trace(go.Scatter(
-            x=df['Date'],
-            y=df[metric],
-            name=metric,
-            line=dict(color=color, width=3),
-            mode='lines+markers',
-            marker=dict(size=6),
-            hovertemplate='<b>%{fullData.name}</b><br>%{x|%b %d}<br>%{y:.1f}%<extra></extra>'
-        ))
+    for col, name, color in metrics:
+        if col in df.columns:
+            fig.add_trace(go.Scatter(
+                x=df['date'],
+                y=df[col],
+                name=name,
+                line=dict(color=color, width=3),
+                mode='lines+markers',
+                marker=dict(size=6),
+                hovertemplate='<b>%{fullData.name}</b><br>%{x|%b %d}<br>%{y:.1f}%<extra></extra>'
+            ))
     
     fig.update_layout(
         **charts.LAYOUT_CONFIG,
@@ -155,26 +152,22 @@ def create_performance_chart():
 
 def create_carbon_chart():
     """Create carbon savings chart"""
-    categories = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun']
+    # ✅ Use demo dataset
+    demo = get_demo_dataset()
+    carbon_df = demo.carbon.tail(6)
+    
+    # Group by month
+    carbon_df['month'] = carbon_df['date'].dt.strftime('%b')
+    monthly = carbon_df.groupby('month')['carbon_saved'].sum().reset_index()
     
     fig = go.Figure()
     
     fig.add_trace(go.Bar(
-        x=categories,
-        y=[234, 289, 312, 298, 356, 401],
+        x=monthly['month'],
+        y=monthly['carbon_saved'],
         name='Carbon Saved',
         marker_color=colors.SUCCESS,
-        hovertemplate='<b>%{x}</b><br>%{y} tonnes<extra></extra>'
-    ))
-    
-    fig.add_trace(go.Scatter(
-        x=categories,
-        y=[234, 289, 312, 298, 356, 401],
-        name='Trend',
-        mode='lines',
-        line=dict(color=colors.WARNING, width=3, dash='dash'),
-        yaxis='y2',
-        showlegend=False
+        hovertemplate='<b>%{x}</b><br>%{y:.0f} tonnes<extra></extra>'
     ))
     
     fig.update_layout(
@@ -188,11 +181,6 @@ def create_carbon_chart():
         },
         xaxis_title='Month',
         yaxis_title='Tonnes CO₂',
-        yaxis2=dict(
-            overlaying='y',
-            side='right',
-            showgrid=False
-        ),
         barmode='group'
     )
     
@@ -200,14 +188,28 @@ def create_carbon_chart():
 
 def create_vessel_status_chart():
     """Create vessel status distribution"""
-    statuses = ['At Berth', 'Waiting', 'In Transit', 'Departed']
-    values = [28, 12, 45, 83]
-    status_colors = [colors.SUCCESS, colors.WARNING, colors.SECONDARY, colors.PRIMARY]
+    # ✅ Use demo dataset
+    demo = get_demo_dataset()
+    
+    # Count vessels by status
+    status_counts = demo.vessels['status'].value_counts()
+    
+    statuses = status_counts.index.tolist()
+    values = status_counts.values.tolist()
+    
+    status_colors_map = {
+        'At Berth': colors.SUCCESS,
+        'Waiting': colors.WARNING,
+        'In Transit': colors.SECONDARY,
+        'Departed': colors.PRIMARY
+    }
+    
+    chart_colors = [status_colors_map.get(s, colors.PRIMARY) for s in statuses]
     
     fig = go.Figure(data=[go.Pie(
         labels=statuses,
         values=values,
-        marker=dict(colors=status_colors),
+        marker=dict(colors=chart_colors),
         hole=0.4,
         textposition='outside',
         textinfo='label+percent',
@@ -238,9 +240,13 @@ def create_vessel_status_chart():
 def render():
     """Render the Global Insights page"""
 
-    # ✅ ADD: Permission check
+    # ✅ Permission check
     from config.permissions import Permission, require_permission
     require_permission(Permission.VIEW_DASHBOARD)
+    
+    # ✅ Load demo data
+    demo = get_demo_dataset()
+    metrics = demo.get_current_metrics()
     
     # KPI Metrics Row
     st.subheader("📊 Key Performance Indicators")
@@ -248,19 +254,44 @@ def render():
     kpi_col1, kpi_col2, kpi_col3, kpi_col4, kpi_col5 = st.columns(5)
     
     with kpi_col1:
-        create_kpi_card("Arrival Accuracy", "87.3%", "+3.2%", "🎯")
+        create_kpi_card(
+            "Arrival Accuracy", 
+            f"{metrics['avg_arrival_accuracy']:.1f}%", 
+            "+3.2%", 
+            "🎯"
+        )
     
     with kpi_col2:
-        create_kpi_card("Avg Wait Time", "2.4 hrs", "-0.8 hrs", "⏱️")
+        create_kpi_card(
+            "Avg Wait Time", 
+            f"{metrics['avg_wait_time']:.1f} hrs", 
+            "-0.8 hrs", 
+            "⏱️"
+        )
     
     with kpi_col3:
-        create_kpi_card("Berth Utilization", "82.1%", "+5.4%", "⚓")
+        create_kpi_card(
+            "Berth Utilization", 
+            f"{metrics['berth_utilization']:.1f}%", 
+            "+5.4%", 
+            "⚓"
+        )
     
     with kpi_col4:
-        create_kpi_card("Carbon Saved", "401 tonnes", "+45 tonnes", "🌱")
+        create_kpi_card(
+            "Carbon Saved", 
+            f"{metrics['total_carbon_saved']:.0f} tonnes", 
+            "+45 tonnes", 
+            "🌱"
+        )
     
     with kpi_col5:
-        create_kpi_card("Bunker Savings", "$87.2K", "+$12.1K", "💰")
+        create_kpi_card(
+            "Bunker Savings", 
+            f"${metrics['total_bunker_saved']/1000:.1f}K", 
+            "+$12.1K", 
+            "💰"
+        )
     
     st.divider()
     
@@ -287,33 +318,43 @@ def render():
     insight_col1, insight_col2 = st.columns([2, 1])
     
     with insight_col1:
-        # Recent activity table
+        # Recent activity table - ✅ Use demo data
         st.subheader("📋 Recent Vessel Movements")
         
-        recent_data = pd.DataFrame({
-            'Vessel': ['MSC Diana', 'Ever Given', 'CMA CGM Antoine', 'Maersk Essex', 'COSCO Shipping'],
-            'From': ['Singapore', 'Shanghai', 'Rotterdam', 'Los Angeles', 'Antwerp'],
-            'To': ['Rotterdam', 'Los Angeles', 'Singapore', 'Shanghai', 'Singapore'],
-            'Status': ['At Berth', 'In Transit', 'Waiting', 'Departed', 'In Transit'],
-            'ETA': ['2h ago', '12h', '4h', 'Completed', '18h'],
-            'Carbon (t)': [12.4, 45.2, 8.7, 32.1, 23.8]
-        })
+        recent_data = pd.DataFrame(demo.get_recent_vessels(5))
         
-        # Color-code status
-        def color_status(val):
-            colors_map = {
-                'At Berth': 'background-color: rgba(6, 214, 160, 0.2)',
-                'In Transit': 'background-color: rgba(0, 180, 216, 0.2)',
-                'Waiting': 'background-color: rgba(255, 214, 10, 0.2)',
-                'Departed': 'background-color: rgba(160, 160, 160, 0.2)'
+        if not recent_data.empty:
+            # Select and rename columns for display
+            display_cols = {
+                'vessel_name': 'Vessel',
+                'from_port': 'From',
+                'to_port': 'To',
+                'status': 'Status',
+                'wait_time_atb_btr': 'Wait (hrs)',
+                'carbon_abatement_tonnes': 'Carbon (t)'
             }
-            return colors_map.get(val, '')
-        
-        st.dataframe(
-            recent_data.style.applymap(color_status, subset=['Status']),
-            use_container_width=True,
-            height=250
-        )
+            
+            display_data = recent_data[list(display_cols.keys())].rename(columns=display_cols)
+            display_data['Wait (hrs)'] = display_data['Wait (hrs)'].round(1)
+            display_data['Carbon (t)'] = display_data['Carbon (t)'].round(1)
+            
+            # Color-code status
+            def color_status(val):
+                colors_map = {
+                    'At Berth': 'background-color: rgba(6, 214, 160, 0.2)',
+                    'In Transit': 'background-color: rgba(0, 180, 216, 0.2)',
+                    'Waiting': 'background-color: rgba(255, 214, 10, 0.2)',
+                    'DEPARTED': 'background-color: rgba(160, 160, 160, 0.2)'
+                }
+                return colors_map.get(val, '')
+            
+            st.dataframe(
+                display_data.style.applymap(color_status, subset=['Status']),
+                use_container_width=True,
+                height=250
+            )
+        else:
+            st.info("No recent vessel movements")
     
     with insight_col2:
         st.plotly_chart(create_vessel_status_chart(), use_container_width=True)
@@ -366,7 +407,7 @@ def render():
         st.error("""
         **Delayed Arrival**
         
-        MSC Mediterranean (IMO: 9876543) delayed by 6.2 hours due to port congestion.
+        MSC Mediterranean (IMO: 9567890) delayed by 6.2 hours due to port congestion.
         
         Berth #7 now available ahead of schedule.
         """)

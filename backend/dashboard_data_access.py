@@ -1,6 +1,6 @@
 """
 Real-time data access for dashboard interpretation
-This ACTUALLY reads your data, not hardcoded
+Can use REAL data or DEMO data
 """
 
 import pandas as pd
@@ -12,24 +12,30 @@ logger = logging.getLogger(__name__)
 
 class DashboardDataAccess:
     """
-    Provides REAL data to the AI agent
+    Provides data to the AI agent
+    Works with both real PDF data and demo data
     """
     
-    def __init__(self, db_manager):
+    def __init__(self, db_manager, use_demo=True):
+        """
+        Args:
+            db_manager: Database manager (PDFDataLoader or DemoDataset)
+            use_demo: If True, using demo data; if False, using real data
+        """
         self.db = db_manager
+        self.use_demo = use_demo
+        logger.info(f"✅ DashboardDataAccess initialized with {'DEMO' if use_demo else 'REAL'} data")
+    
+    # Rest of the methods stay exactly the same!
+    # They work with both real and demo data because both have the same API
     
     def get_current_state(self) -> Dict[str, Any]:
-        """
-        Get ACTUAL current dashboard state
-        This is what the AI "sees"
-        """
+        """Get ACTUAL current dashboard state"""
         try:
-            # Get REAL data from database/PDF
             recent_vessels = self.db.get_recent_vessels(limit=100)
             performance_metrics = self.db.get_current_metrics()
             berth_status = self.db.get_berth_availability()
             
-            # Convert to AI-readable format
             state = {
                 "timestamp": datetime.now().isoformat(),
                 "vessels": {
@@ -42,7 +48,7 @@ class DashboardDataAccess:
                             "berth": v.get('berth'),
                             "status": v.get('status'),
                             "wait_time": v.get('wait_time_atb_btr'),
-                            "arrival_time": str(v.get('atb'))
+                            "arrival_time": str(v.get('atb', ''))
                         }
                         for v in recent_vessels[:10]
                     ]
@@ -73,6 +79,9 @@ class DashboardDataAccess:
             logger.error(f"Error getting dashboard state: {e}")
             return {"error": str(e)}
     
+    # ... rest of the methods stay exactly the same ...
+    # (keep all existing methods: filter_data, analyze_delays, get_recommendations, etc.)
+
     def filter_data(self, filters: Dict[str, Any]) -> Dict[str, Any]:
         """
         Execute ACTUAL database query based on AI's filter request

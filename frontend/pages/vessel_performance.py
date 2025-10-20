@@ -1,7 +1,6 @@
 """
 Vessel Performance Page
 Individual vessel analytics and performance tracking
-Frontend Engineer: UI/UX Specialist
 """
 
 import streamlit as st
@@ -11,29 +10,27 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 from frontend.config import colors, charts
+from data.demo_dataset import get_demo_dataset  # ✅ Import demo dataset
 
 
 def create_vessel_selector():
     """Create vessel search and selection interface"""
     
+    # ✅ Use demo dataset
+    demo = get_demo_dataset()
+    
     col1, col2 = st.columns([3, 1])
     
     with col1:
-        # Sample vessel list
-        vessels = [
-            "MSC Diana (IMO: 9876543)",
-            "Ever Given (IMO: 9811000)",
-            "CMA CGM Antoine (IMO: 9454436)",
-            "Maersk Essex (IMO: 9632101)",
-            "COSCO Shipping (IMO: 9793241)",
-            "Hapag-Lloyd Berlin (IMO: 9234567)",
-            "ONE Innovation (IMO: 9345678)",
-            "Yang Ming Excellence (IMO: 9456789)"
+        # Get vessel list from demo data
+        vessel_options = [
+            f"{row['vessel_name']} (IMO: {row['imo_number']})"
+            for _, row in demo.vessels.iterrows()
         ]
         
         selected_vessel = st.selectbox(
             "🚢 Select Vessel",
-            vessels,
+            vessel_options,
             help="Search by vessel name or IMO number"
         )
         
@@ -50,6 +47,22 @@ def create_vessel_selector():
 def create_vessel_info_card(vessel_name: str, imo: str):
     """Display vessel information card"""
     
+    # ✅ Get vessel info from demo data
+    demo = get_demo_dataset()
+    vessel_info = demo.vessels[demo.vessels['imo_number'] == imo]
+    
+    if not vessel_info.empty:
+        vessel = vessel_info.iloc[0]
+        operator = vessel['operator']
+        service = vessel['service']
+        status = vessel['status']
+        status_color = '#06D6A0' if status == 'At Berth' else '#00B4D8'
+    else:
+        operator = "MSC"
+        service = "Asia-Europe"
+        status = "At Berth"
+        status_color = '#06D6A0'
+    
     st.markdown(f"""
         <div style='background: linear-gradient(135deg, rgba(0, 102, 204, 0.2), rgba(0, 180, 216, 0.2));
                     padding: 1.5rem;
@@ -64,15 +77,15 @@ def create_vessel_info_card(vessel_name: str, imo: str):
                 </div>
                 <div>
                     <p style='color: #A0A0A0; font-size: 0.8rem; margin: 0;'>Operator</p>
-                    <p style='color: white; font-size: 1.1rem; font-weight: 600; margin: 0.25rem 0 0 0;'>MSC</p>
+                    <p style='color: white; font-size: 1.1rem; font-weight: 600; margin: 0.25rem 0 0 0;'>{operator}</p>
                 </div>
                 <div>
                     <p style='color: #A0A0A0; font-size: 0.8rem; margin: 0;'>Service</p>
-                    <p style='color: white; font-size: 1.1rem; font-weight: 600; margin: 0.25rem 0 0 0;'>Asia-Europe</p>
+                    <p style='color: white; font-size: 1.1rem; font-weight: 600; margin: 0.25rem 0 0 0;'>{service}</p>
                 </div>
                 <div>
                     <p style='color: #A0A0A0; font-size: 0.8rem; margin: 0;'>Current Status</p>
-                    <p style='color: #06D6A0; font-size: 1.1rem; font-weight: 600; margin: 0.25rem 0 0 0;'>At Berth</p>
+                    <p style='color: {status_color}; font-size: 1.1rem; font-weight: 600; margin: 0.25rem 0 0 0;'>{status}</p>
                 </div>
             </div>
         </div>
@@ -130,20 +143,16 @@ def create_performance_summary():
 def create_arrival_accuracy_trend():
     """Create arrival accuracy trend chart"""
     
-    # Generate sample data
-    dates = pd.date_range(end=datetime.now(), periods=60, freq='D')
-    df = pd.DataFrame({
-        'Date': dates,
-        'Accuracy': np.random.normal(92, 3, 60).clip(80, 100),
-        'Target': [90] * 60
-    })
+    # ✅ Use demo dataset
+    demo = get_demo_dataset()
+    df = demo.performance.tail(60)
     
     fig = go.Figure()
     
     # Actual accuracy
     fig.add_trace(go.Scatter(
-        x=df['Date'],
-        y=df['Accuracy'],
+        x=df['date'],
+        y=df['avg_arrival_accuracy'],
         name='Actual Accuracy',
         line=dict(color=colors.PRIMARY, width=3),
         fill='tonexty',
@@ -154,21 +163,10 @@ def create_arrival_accuracy_trend():
     
     # Target line
     fig.add_trace(go.Scatter(
-        x=df['Date'],
-        y=df['Target'],
+        x=df['date'],
+        y=[90] * len(df),
         name='Target (90%)',
         line=dict(color=colors.WARNING, width=2, dash='dash'),
-        mode='lines'
-    ))
-    
-    # Add trend line
-    z = np.polyfit(range(len(df)), df['Accuracy'], 1)
-    p = np.poly1d(z)
-    fig.add_trace(go.Scatter(
-        x=df['Date'],
-        y=p(range(len(df))),
-        name='Trend',
-        line=dict(color=colors.SUCCESS, width=2, dash='dot'),
         mode='lines'
     ))
     
@@ -199,7 +197,7 @@ def create_arrival_accuracy_trend():
 def create_wait_time_breakdown():
     """Create wait time breakdown chart"""
     
-    # Sample data
+    # Sample data for wait time causes
     categories = ['Port Congestion', 'Weather Delays', 'Berth Unavailable', 
                   'Documentation', 'Pilot Delays', 'Other']
     values = [35, 20, 25, 10, 8, 2]
@@ -235,168 +233,42 @@ def create_wait_time_breakdown():
     return fig
 
 
-def create_route_efficiency_map():
-    """Create route efficiency visualization"""
-    
-    # Sample route data
-    routes = pd.DataFrame({
-        'From': ['Singapore', 'Shanghai', 'Rotterdam', 'Los Angeles'],
-        'To': ['Rotterdam', 'Los Angeles', 'Singapore', 'Shanghai'],
-        'from_lat': [1.3521, 31.2304, 51.9225, 33.7701],
-        'from_lon': [103.8198, 121.4737, 4.47917, -118.1937],
-        'to_lat': [51.9225, 33.7701, 1.3521, 31.2304],
-        'to_lon': [4.47917, -118.1937, 103.8198, 121.4737],
-        'efficiency': [95, 88, 92, 85],
-        'trips': [12, 8, 10, 6]
-    })
-    
-    fig = go.Figure()
-    
-    # Add routes
-    for _, route in routes.iterrows():
-        # Determine color based on efficiency
-        if route['efficiency'] >= 90:
-            color = colors.SUCCESS
-        elif route['efficiency'] >= 85:
-            color = colors.WARNING
-        else:
-            color = colors.DANGER
-        
-        fig.add_trace(go.Scattergeo(
-            lon=[route['from_lon'], route['to_lon']],
-            lat=[route['from_lat'], route['to_lat']],
-            mode='lines+markers',
-            line=dict(width=3, color=color),
-            marker=dict(size=10, color=color),
-            name=f"{route['From']} → {route['To']}",
-            text=f"Efficiency: {route['efficiency']}%<br>Trips: {route['trips']}",
-            hoverinfo='text'
-        ))
-    
-    fig.update_layout(
-        **charts.LAYOUT_CONFIG,
-        height=500,
-        geo=dict(
-            projection_type='natural earth',
-            showland=True,
-            landcolor='rgb(20, 20, 30)',
-            coastlinecolor='rgb(100, 100, 120)',
-            showlakes=True,
-            lakecolor='rgb(10, 10, 20)',
-            showcountries=True,
-            countrycolor='rgb(80, 80, 100)',
-            bgcolor='rgba(0,0,0,0)'
-        ),
-        title={
-            'text': '🗺️ Route Efficiency Analysis',
-            'font': {'size': 20, 'color': 'white'},
-            'x': 0.5,
-            'xanchor': 'center'
-        },
-        showlegend=True,
-        legend=dict(
-            yanchor='top',
-            y=0.99,
-            xanchor='left',
-            x=0.01,
-            bgcolor='rgba(0,0,0,0.5)'
-        )
-    )
-    
-    return fig
-
-
-def create_comparison_radar():
-    """Create performance comparison radar chart"""
-    
-    categories = ['Arrival Accuracy', 'Berth Efficiency', 'Carbon Performance', 
-                  'Cost Efficiency', 'Schedule Reliability']
-    
-    fig = go.Figure()
-    
-    # This vessel
-    fig.add_trace(go.Scatterpolar(
-        r=[94, 88, 92, 85, 90],
-        theta=categories,
-        fill='toself',
-        name='This Vessel',
-        line=dict(color=colors.PRIMARY, width=2),
-        fillcolor='rgba(0, 102, 204, 0.2)'
-    ))
-    
-    # Fleet average
-    fig.add_trace(go.Scatterpolar(
-        r=[87, 82, 85, 80, 83],
-        theta=categories,
-        fill='toself',
-        name='Fleet Average',
-        line=dict(color=colors.WARNING, width=2, dash='dash'),
-        fillcolor='rgba(255, 214, 10, 0.1)'
-    ))
-    
-    # Top performer
-    fig.add_trace(go.Scatterpolar(
-        r=[98, 95, 96, 92, 94],
-        theta=categories,
-        fill='toself',
-        name='Top Performer',
-        line=dict(color=colors.SUCCESS, width=2, dash='dot'),
-        fillcolor='rgba(6, 214, 160, 0.1)'
-    ))
-    
-    fig.update_layout(
-        **charts.LAYOUT_CONFIG,
-        height=450,
-        polar=dict(
-            radialaxis=dict(
-                visible=True,
-                range=[0, 100],
-                showline=False,
-                gridcolor='rgba(255, 255, 255, 0.2)'
-            ),
-            angularaxis=dict(
-                gridcolor='rgba(255, 255, 255, 0.2)'
-            ),
-            bgcolor='rgba(0,0,0,0)'
-        ),
-        title={
-            'text': '📊 Performance Comparison',
-            'font': {'size': 20, 'color': 'white'},
-            'x': 0.5,
-            'xanchor': 'center'
-        },
-        showlegend=True,
-        legend=dict(
-            orientation='h',
-            yanchor='bottom',
-            y=-0.2,
-            xanchor='center',
-            x=0.5
-        )
-    )
-    
-    return fig
-
-
-def create_movement_history_table():
+def create_movement_history_table(imo: str):
     """Create recent movement history table"""
     
-    # Sample data
-    movements = pd.DataFrame({
-        'Date': pd.date_range(end=datetime.now(), periods=10, freq='7D')[::-1],
-        'From': ['Singapore', 'Rotterdam', 'Shanghai', 'Singapore', 'Los Angeles',
-                 'Singapore', 'Rotterdam', 'Shanghai', 'Singapore', 'Los Angeles'],
-        'To': ['Rotterdam', 'Singapore', 'Los Angeles', 'Shanghai', 'Singapore',
-               'Rotterdam', 'Shanghai', 'Singapore', 'Rotterdam', 'Shanghai'],
-        'Berth': ['B02', 'B05', 'B03', 'B07', 'B04', 'B02', 'B08', 'B05', 'B02', 'B06'],
-        'Wait (hrs)': [1.2, 2.1, 0.8, 1.5, 3.2, 1.8, 1.0, 2.5, 1.4, 2.0],
-        'Accuracy (%)': [95.5, 92.3, 98.2, 91.0, 88.5, 94.2, 96.8, 89.5, 95.0, 93.2],
-        'Carbon (t)': [12.4, 15.2, 10.8, 13.5, 18.2, 12.1, 11.5, 14.8, 12.7, 13.9],
-        'Status': ['✅ Complete', '✅ Complete', '✅ Complete', '✅ Complete', '✅ Complete',
-                   '✅ Complete', '✅ Complete', '✅ Complete', '✅ Complete', '⏸️ Current']
-    })
+    # ✅ Use demo dataset
+    demo = get_demo_dataset()
     
-    movements['Date'] = movements['Date'].dt.strftime('%Y-%m-%d')
+    # Get movements for this vessel
+    vessel_movements = demo.movements[demo.movements['imo_number'] == imo].tail(10)
+    
+    if not vessel_movements.empty:
+        movements = pd.DataFrame({
+            'Date': vessel_movements['date'].dt.strftime('%Y-%m-%d'),
+            'From': vessel_movements['from_port'],
+            'To': vessel_movements['to_port'],
+            'Berth': vessel_movements['berth'],
+            'Wait (hrs)': vessel_movements['wait_time_atb_btr'].round(1),
+            'Accuracy (%)': vessel_movements['arrival_accuracy_final_btr'].round(1),
+            'Carbon (t)': vessel_movements['carbon_abatement_tonnes'].round(1),
+            'Status': '✅ Complete'
+        })
+        
+        # Mark the most recent as current
+        if len(movements) > 0:
+            movements.loc[movements.index[-1], 'Status'] = '⏸️ Current'
+    else:
+        # Fallback if no data
+        movements = pd.DataFrame({
+            'Date': [(datetime.now() - timedelta(days=i)).strftime('%Y-%m-%d') for i in range(10, 0, -1)],
+            'From': ['Singapore', 'Rotterdam'] * 5,
+            'To': ['Rotterdam', 'Singapore'] * 5,
+            'Berth': [f'B{i:02d}' for i in range(1, 11)],
+            'Wait (hrs)': np.random.uniform(1, 3, 10).round(1),
+            'Accuracy (%)': np.random.uniform(88, 98, 10).round(1),
+            'Carbon (t)': np.random.uniform(10, 15, 10).round(1),
+            'Status': ['✅ Complete'] * 9 + ['⏸️ Current']
+        })
     
     # Style the dataframe
     def highlight_current(row):
@@ -412,7 +284,7 @@ def create_movement_history_table():
 def render():
     """Render the Vessel Performance page"""
 
-    # ✅ ADD: Permission check
+    # ✅ Permission check
     from config.permissions import Permission, require_permission
     require_permission(Permission.VIEW_VESSELS)
     
@@ -444,25 +316,13 @@ def render():
     
     st.divider()
     
-    # Route efficiency
-    st.subheader("🗺️ Route Performance")
-    st.plotly_chart(create_route_efficiency_map(), use_container_width=True)
-    
-    st.divider()
-    
-    # Comparison and history
-    comp_col1, comp_col2 = st.columns([1, 1])
-    
-    with comp_col1:
-        st.plotly_chart(create_comparison_radar(), use_container_width=True)
-    
-    with comp_col2:
-        st.subheader("📋 Recent Movement History")
-        st.dataframe(
-            create_movement_history_table(),
-            use_container_width=True,
-            height=400
-        )
+    # Movement history
+    st.subheader("📋 Recent Movement History")
+    st.dataframe(
+        create_movement_history_table(imo),
+        use_container_width=True,
+        height=400
+    )
     
     st.divider()
     
