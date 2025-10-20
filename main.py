@@ -317,8 +317,15 @@ def main():
     else:
         st.error(f"Page '{selected_page}' not found")
 
+    # --- Page Navigation Handling ---
+    selected_page = st.session_state.get("current_page", "Dashboard")
+
+    # ✅ Auto-close popup when user navigates to AI Chatbot page
+    if selected_page == "AI Chatbot" and st.session_state.get("show_chat_popup", False):
+        st.session_state.show_chat_popup = False
+
     # -------------------------
-    # Floating Chat Button
+    # Floating Chat popup
     # -------------------------
     # Chat popup logic (controlled by header button)
     if st.session_state.get("show_chat_popup", False):
