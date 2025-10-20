@@ -17,7 +17,7 @@ st.set_page_config(
 
 from pathlib import Path
 import sys
-from frontend.components.chat_overlay import chat_overlay
+# from frontend.components.chat_overlay import chat_overlay
 
 # Add project root to path
 sys.path.append(str(Path(__file__).parent))
