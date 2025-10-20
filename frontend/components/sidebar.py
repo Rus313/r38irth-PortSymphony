@@ -22,32 +22,32 @@ def render_sidebar() -> str:
         
         st.divider()
         
-        # Department Selection
-        st.subheader("👤 Department")
-        selected_dept = st.selectbox(
-            "Select your department",
-            options=list(departments.DEPARTMENTS.keys()),
-            index=list(departments.DEPARTMENTS.keys()).index(st.session_state.user_department),
-            label_visibility="collapsed"
-        )
-        st.session_state.user_department = selected_dept
+        # # Department Selection
+        # st.subheader("👤 Department")
+        # selected_dept = st.selectbox(
+        #     "Select your department",
+        #     options=list(departments.DEPARTMENTS.keys()),
+        #     index=list(departments.DEPARTMENTS.keys()).index(st.session_state.user_department),
+        #     label_visibility="collapsed"
+        # )
+        # st.session_state.user_department = selected_dept
         
-        # Show department-specific info
-        dept_info = departments.DEPARTMENTS[selected_dept]
-        st.markdown(f"""
-            <div style='background: rgba(0, 180, 216, 0.1); 
-                        padding: 1rem; 
-                        border-radius: 8px; 
-                        border-left: 4px solid {dept_info["color"]};
-                        margin-bottom: 1rem;'>
-                <p style='color: #A0A0A0; font-size: 0.8rem; margin: 0;'>Available Modules:</p>
-                <p style='color: white; margin: 0.5rem 0 0 0; font-size: 0.9rem;'>
-                    {', '.join(dept_info['modules'])}
-                </p>
-            </div>
-        """, unsafe_allow_html=True)
+        # # Show department-specific info
+        # dept_info = departments.DEPARTMENTS[selected_dept]
+        # st.markdown(f"""
+        #     <div style='background: rgba(0, 180, 216, 0.1); 
+        #                 padding: 1rem; 
+        #                 border-radius: 8px; 
+        #                 border-left: 4px solid {dept_info["color"]};
+        #                 margin-bottom: 1rem;'>
+        #         <p style='color: #A0A0A0; font-size: 0.8rem; margin: 0;'>Available Modules:</p>
+        #         <p style='color: white; margin: 0.5rem 0 0 0; font-size: 0.9rem;'>
+        #             {', '.join(dept_info['modules'])}
+        #         </p>
+        #     </div>
+        # """, unsafe_allow_html=True)
         
-        st.divider()
+        # st.divider()
         
         # Navigation
         st.subheader("🧭 Navigation")

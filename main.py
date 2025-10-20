@@ -92,6 +92,7 @@ def load_custom_css():
             padding: 1rem;
             margin-bottom: 1rem;
             border: 1px solid rgba(255, 255, 255, 0.1);
+            max-height: 60% !important; 
         }
         
         /* Button styling */
@@ -117,6 +118,48 @@ def load_custom_css():
             border-right: 1px solid rgba(255, 255, 255, 0.1);
         }
         
+        /* Floating chat button */
+        .chat-button {
+            position: fixed;
+            bottom: 25px;
+            right: 25px;
+            background-color: #0078ff;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            font-size: 28px;
+            cursor: pointer;
+            box-shadow: 0px 4px 12px rgba(0,0,0,0.3);
+            z-index: 1000;
+            transition: all 0.2s ease-in-out;
+        }
+        .chat-button:hover {
+            transform: scale(1.1);
+            background-color: #005ecc;
+        }
+
+        /* Chat popup */
+        .chat-popup {
+            position: fixed;
+            bottom: 10px;
+            right: 25px;
+            width: 300px;
+            height: 450px;
+            background-color: #0e1117;
+            border: 1px solid #444;
+            border-radius: 12px;
+            z-index: 1001;
+            overflow: hidden;
+        }
+        .chat-popup iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background-color: #0e1117;
+        }        
+
         /* Hide Streamlit branding */
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
@@ -147,6 +190,9 @@ def initialize_session_state():
     
     if 'theme' not in st.session_state:
         st.session_state.theme = 'dark'
+    
+    if 'show_chat_popup' not in st.session_state:
+        st.session_state.show_chat_popup = False
 
 @st.cache_resource
 def init_data_source():
@@ -248,8 +294,16 @@ def main():
     
     # Render sidebar and get selected page
     selected_page = render_sidebar()
-    
-    # Route to appropriate page
+
+    # -------------------------
+    # Handle AI Chat Popup (via iframe page)
+    # -------------------------
+    query_params = st.experimental_get_query_params()
+    if query_params.get("page") == ["ai_chat_popup"]:
+        ai_chatbot.render()
+        return
+
+    # Normal routing
     page_routing = {
         'Global Insights': global_insights.render,
         'Vessel Performance': vessel_performance.render,
@@ -257,12 +311,28 @@ def main():
         'Berth Management': berth_management.render,
         'AI Chatbot': ai_chatbot.render
     }
-    
-    # Render selected page
+
     if selected_page in page_routing:
         page_routing[selected_page]()
     else:
         st.error(f"Page '{selected_page}' not found")
+
+    # -------------------------
+    # Floating Chat Button
+    # -------------------------
+    # Show button only if not on dedicated AI Chatbot page
+    if selected_page != 'AI Chatbot':
+        # Toggle popup via Streamlit button
+        if st.button("🤖", key="open_chat_button"):
+            st.session_state.show_chat_popup = not st.session_state.show_chat_popup
+
+        # Render popup
+        if st.session_state.show_chat_popup:
+            st.markdown("""
+            <div class="chat-popup">
+                <iframe src="?page=ai_chat_popup"></iframe>
+            </div>
+            """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()

@@ -25,6 +25,38 @@ agent = init_smart_agent()
 # Render AI Chat Page
 # -------------------------
 def render():
+
+    # -------------------------
+    # Custom CSS for chat messages
+    # -------------------------
+    st.markdown("""
+        <style>
+        /* All chat messages */
+        div[data-testid="stChatMessage"] div[data-testid="stMarkdownContainer"] p {
+            font-size: 12px !important;  /* Adjust font size */
+            line-height: 1.5 !important; /* Optional spacing */
+            max-width: 60% !important;      /* Adjust width of chat bubbles */
+            padding: 6px 12px !important;   /* Smaller padding inside bubble */
+            margin-bottom: 6px !important;  /* Reduce spacing between messages */
+            border-radius: 10px !important; /* Optional: adjust bubble corners */
+            font-size: 16px !important;     /* Ensure font-size fits bubble */
+        }
+
+        /* User messages */
+        div[data-testid="stChatMessage"][data-owner="user"] div[data-testid="stMarkdownContainer"] p {
+            font-size: 12px !important;
+            margin-left: auto !important;  /* Keep on right side */
+        }
+
+        /* Assistant messages */
+        div[data-testid="stChatMessage"][data-owner="assistant"] div[data-testid="stMarkdownContainer"] p {
+            font-size: 12x !important;
+            margin-right: auto !important; /* Keep on left side */
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+
     st.subheader("🤖 AI Dashboard Assistant")
     st.caption("I'm an expert maritime analyst with real-time access to your dashboard data!")
     
