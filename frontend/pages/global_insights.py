@@ -1,6 +1,7 @@
 """
-Global Insights Page
+Global Insights Page - COMPLETE REAL DATA VERSION
 Overview dashboard with key metrics and visualizations
+All data comes from UnifiedDataService
 """
 
 import streamlit as st
@@ -10,7 +11,10 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 from frontend.config import colors, charts
-from data.demo_dataset import get_demo_dataset  # ✅ Import demo dataset
+from data.unified_data_service import get_data_service
+
+# Initialize data service
+data_service = get_data_service()
 
 def create_kpi_card(label: str, value: str, delta: str = None, icon: str = "📊"):
     """Create a KPI metric card"""
@@ -28,25 +32,22 @@ def create_kpi_card(label: str, value: str, delta: str = None, icon: str = "📊
         delta_color=delta_color
     )
 
-def create_port_map():
-    """Create interactive port and vessel route map"""
-    # ✅ Use demo dataset
-    demo = get_demo_dataset()
-    ports = demo.ports
+def create_port_map(port_data: pd.DataFrame):
+    """Create interactive port map with REAL DATA"""
     
-    # Create vessel routes from recent movements
-    recent_moves = demo.movements.tail(4)
+    if port_data.empty:
+        return None
     
     fig = go.Figure()
     
-    # Add port markers
+    # Add port markers with REAL data
     fig.add_trace(go.Scattergeo(
-        lon=ports['longitude'],
-        lat=ports['latitude'],
-        text=ports['port_name'] + '<br>Vessels: ' + ports['vessel_count'].astype(str),
+        lon=port_data['lon'],
+        lat=port_data['lat'],
+        text=port_data['port'] + '<br>Vessels: ' + port_data['vessel_count'].astype(str),
         mode='markers+text',
         marker=dict(
-            size=ports['vessel_count'] / 2,
+            size=port_data['vessel_count'] / 2,
             color=colors.SECONDARY,
             line=dict(width=2, color='white'),
             sizemode='diameter'
@@ -56,25 +57,6 @@ def create_port_map():
         name='Ports',
         hovertemplate='<b>%{text}</b><br>Lat: %{lat}<br>Lon: %{lon}<extra></extra>'
     ))
-    
-    # Add sample routes (simplified - just showing concept)
-    route_colors = [colors.PRIMARY, colors.SUCCESS, colors.WARNING, colors.DANGER]
-    
-    for i in range(min(4, len(recent_moves))):
-        move = recent_moves.iloc[i]
-        from_port = ports[ports['port_name'] == move['from_port']]
-        to_port = ports[ports['port_name'] == move['to_port']]
-        
-        if not from_port.empty and not to_port.empty:
-            fig.add_trace(go.Scattergeo(
-                lon=[from_port.iloc[0]['longitude'], to_port.iloc[0]['longitude']],
-                lat=[from_port.iloc[0]['latitude'], to_port.iloc[0]['latitude']],
-                mode='lines',
-                line=dict(width=2, color=route_colors[i % 4]),
-                opacity=0.6,
-                showlegend=False,
-                hoverinfo='skip'
-            ))
     
     # Update layout
     fig.update_layout(
@@ -101,43 +83,77 @@ def create_port_map():
     
     return fig
 
-def create_performance_chart():
-    """Create performance trend chart"""
-    # ✅ Use demo dataset
-    demo = get_demo_dataset()
-    df = demo.performance.tail(30)
+def create_performance_chart(perf_data: pd.DataFrame):
+    """Create performance trend chart with REAL DATA"""
+    
+    if perf_data.empty:
+        return None
     
     fig = go.Figure()
     
-    metrics = [
-        ('avg_arrival_accuracy', 'Arrival Accuracy', colors.PRIMARY),
-        ('berth_utilization', 'Berth Utilization', colors.SUCCESS),
-        ('on_time_performance', 'On-Time Performance', colors.SECONDARY)
-    ]
+    # Find available metric columns
+    metric_columns = []
     
-    for col, name, color in metrics:
-        if col in df.columns:
+    # Check for accuracy columns
+    for col in ['avg_accuracy', 'avg_arrival_accuracy', 'arrival_accuracy_final_btr']:
+        if col in perf_data.columns:
+            metric_columns.append((col, 'Arrival Accuracy', colors.PRIMARY))
+            break
+    
+    # Check for wait time
+    for col in ['avg_wait_time', 'wait_time_atb_btr']:
+        if col in perf_data.columns:
+            # Convert to percentage scale (inverse: lower is better)
+            metric_columns.append((col, 'Wait Time Efficiency', colors.SUCCESS))
+            break
+    
+    # Check for berth time
+    for col in ['avg_berth_time', 'berth_time_hours']:
+        if col in perf_data.columns:
+            metric_columns.append((col, 'Berth Efficiency', colors.SECONDARY))
+            break
+    
+    # Plot available metrics
+    for col, name, color in metric_columns[:3]:  # Max 3 metrics
+        if col in perf_data.columns:
+            values = perf_data[col]
+            
+            # For wait time, convert to efficiency score
+            if 'wait' in col.lower():
+                # Inverse scale: 0 hours = 100%, 10 hours = 0%
+                values = 100 - (values * 10).clip(0, 100)
+            
             fig.add_trace(go.Scatter(
-                x=df['date'],
-                y=df[col],
+                x=perf_data['date'],
+                y=values,
                 name=name,
                 line=dict(color=color, width=3),
                 mode='lines+markers',
                 marker=dict(size=6),
-                hovertemplate='<b>%{fullData.name}</b><br>%{x|%b %d}<br>%{y:.1f}%<extra></extra>'
+                hovertemplate=f'<b>{name}</b><br>%{{x}}<br>%{{y:.1f}}<extra></extra>'
             ))
+    
+    # Add target line if we have accuracy
+    if metric_columns:
+        fig.add_hline(
+            y=90,
+            line_dash='dash',
+            line_color=colors.WARNING,
+            annotation_text='Target: 90%',
+            annotation_position='right'
+        )
     
     fig.update_layout(
         **charts.LAYOUT_CONFIG,
         height=400,
         title={
-            'text': '📈 Performance Trends (Last 30 Days)',
+            'text': f'📈 Performance Trends (Last {len(perf_data)} Days)',
             'font': {'size': 20, 'color': 'white'},
             'x': 0.5,
             'xanchor': 'center'
         },
         xaxis_title='Date',
-        yaxis_title='Percentage (%)',
+        yaxis_title='Performance Score',
         yaxis=dict(range=[0, 100]),
         legend=dict(
             orientation='h',
@@ -145,30 +161,45 @@ def create_performance_chart():
             y=1.02,
             xanchor='right',
             x=1
-        ),
+        )
     )
     
     return fig
 
-def create_carbon_chart():
-    """Create carbon savings chart"""
-    # ✅ Use demo dataset
-    demo = get_demo_dataset()
-    carbon_df = demo.carbon.tail(6)
+def create_carbon_chart(carbon_data: pd.DataFrame):
+    """Create carbon savings chart with REAL DATA"""
     
-    # Group by month
-    carbon_df['month'] = carbon_df['date'].dt.strftime('%b')
-    monthly = carbon_df.groupby('month')['carbon_saved'].sum().reset_index()
+    if carbon_data.empty:
+        return None
+    
+    # Prepare data - group by month
+    carbon_data = carbon_data.copy()
+    carbon_data['date'] = pd.to_datetime(carbon_data['date'])
+    carbon_data['month'] = carbon_data['date'].dt.to_period('M').astype(str)
+    
+    monthly = carbon_data.groupby('month')['savings'].sum().reset_index()
     
     fig = go.Figure()
     
     fig.add_trace(go.Bar(
         x=monthly['month'],
-        y=monthly['carbon_saved'],
+        y=monthly['savings'],
         name='Carbon Saved',
         marker_color=colors.SUCCESS,
-        hovertemplate='<b>%{x}</b><br>%{y:.0f} tonnes<extra></extra>'
+        hovertemplate='<b>%{x}</b><br>%{y:.1f} tonnes<extra></extra>'
     ))
+    
+    # Add trend line if we have enough data
+    if len(monthly) > 2:
+        fig.add_trace(go.Scatter(
+            x=monthly['month'],
+            y=monthly['savings'],
+            name='Trend',
+            mode='lines',
+            line=dict(color=colors.WARNING, width=3, dash='dash'),
+            yaxis='y2',
+            showlegend=False
+        ))
     
     fig.update_layout(
         **charts.LAYOUT_CONFIG,
@@ -181,27 +212,33 @@ def create_carbon_chart():
         },
         xaxis_title='Month',
         yaxis_title='Tonnes CO₂',
+        yaxis2=dict(
+            overlaying='y',
+            side='right',
+            showgrid=False
+        ),
         barmode='group'
     )
     
     return fig
 
-def create_vessel_status_chart():
-    """Create vessel status distribution"""
-    # ✅ Use demo dataset
-    demo = get_demo_dataset()
+def create_vessel_status_chart(status_dist: dict):
+    """Create vessel status distribution with REAL DATA"""
     
-    # Count vessels by status
-    status_counts = demo.vessels['status'].value_counts()
+    if not status_dist:
+        return None
     
-    statuses = status_counts.index.tolist()
-    values = status_counts.values.tolist()
+    statuses = list(status_dist.keys())
+    values = list(status_dist.values())
     
+    # Assign colors
     status_colors_map = {
         'At Berth': colors.SUCCESS,
         'Waiting': colors.WARNING,
         'In Transit': colors.SECONDARY,
-        'Departed': colors.PRIMARY
+        'Departed': colors.PRIMARY,
+        'DEPARTED': colors.PRIMARY,
+        'Delayed': colors.DANGER
     }
     
     chart_colors = [status_colors_map.get(s, colors.PRIMARY) for s in statuses]
@@ -238,17 +275,18 @@ def create_vessel_status_chart():
     return fig
 
 def render():
-    """Render the Global Insights page"""
+    """Render the Global Insights page with REAL DATA"""
 
-    # ✅ Permission check
+    # Permission check
     from config.permissions import Permission, require_permission
     require_permission(Permission.VIEW_DASHBOARD)
     
-    # ✅ Load demo data
-    demo = get_demo_dataset()
-    metrics = demo.get_current_metrics()
+    # GET REAL DATA
+    with st.spinner("Loading dashboard data..."):
+        kpis = data_service.get_global_kpis()
+        deltas = data_service.get_kpi_deltas()
     
-    # KPI Metrics Row
+    # KPI Metrics Row - REAL DATA
     st.subheader("📊 Key Performance Indicators")
     
     kpi_col1, kpi_col2, kpi_col3, kpi_col4, kpi_col5 = st.columns(5)
@@ -256,167 +294,261 @@ def render():
     with kpi_col1:
         create_kpi_card(
             "Arrival Accuracy", 
-            f"{metrics['avg_arrival_accuracy']:.1f}%", 
-            "+3.2%", 
+            f"{kpis['arrival_accuracy']:.1f}%", 
+            deltas['arrival_accuracy'], 
             "🎯"
         )
     
     with kpi_col2:
         create_kpi_card(
             "Avg Wait Time", 
-            f"{metrics['avg_wait_time']:.1f} hrs", 
-            "-0.8 hrs", 
+            f"{kpis['avg_wait_time']:.1f} hrs", 
+            deltas['avg_wait_time'], 
             "⏱️"
         )
     
     with kpi_col3:
         create_kpi_card(
             "Berth Utilization", 
-            f"{metrics['berth_utilization']:.1f}%", 
-            "+5.4%", 
+            f"{kpis['berth_utilization']:.1f}%", 
+            deltas['berth_utilization'], 
             "⚓"
         )
     
     with kpi_col4:
         create_kpi_card(
             "Carbon Saved", 
-            f"{metrics['total_carbon_saved']:.0f} tonnes", 
-            "+45 tonnes", 
+            f"{kpis['carbon_saved']:.0f} tonnes", 
+            deltas['carbon_saved'], 
             "🌱"
         )
     
     with kpi_col5:
         create_kpi_card(
             "Bunker Savings", 
-            f"${metrics['total_bunker_saved']/1000:.1f}K", 
-            "+$12.1K", 
+            f"${kpis['bunker_savings']/1000:.1f}K", 
+            deltas['bunker_savings'], 
             "💰"
         )
     
     st.divider()
     
-    # Main visualizations
+    # Main visualizations - REAL DATA
     st.subheader("🌍 Global Network Overview")
     
-    # Port map (full width)
-    st.plotly_chart(create_port_map(), use_container_width=True)
+    # Port map with REAL data
+    port_data = data_service.get_port_data()
+    if not port_data.empty:
+        port_map = create_port_map(port_data)
+        if port_map:
+            st.plotly_chart(port_map, use_container_width=True)
+        else:
+            st.info("📍 Port map unavailable - no location data")
+    else:
+        st.info("📍 No port data available in current dataset")
     
     st.divider()
     
-    # Charts row
+    # Charts row - REAL DATA
     chart_col1, chart_col2 = st.columns(2)
     
     with chart_col1:
-        st.plotly_chart(create_performance_chart(), use_container_width=True)
+        perf_data = data_service.get_performance_trends(days=30)
+        if not perf_data.empty:
+            perf_chart = create_performance_chart(perf_data)
+            if perf_chart:
+                st.plotly_chart(perf_chart, use_container_width=True)
+            else:
+                st.info("📊 Performance chart unavailable")
+        else:
+            st.info("📊 No performance trend data available")
     
     with chart_col2:
-        st.plotly_chart(create_carbon_chart(), use_container_width=True)
+        carbon_data = data_service.get_carbon_trends(days=180)
+        if not carbon_data.empty:
+            carbon_chart = create_carbon_chart(carbon_data)
+            if carbon_chart:
+                st.plotly_chart(carbon_chart, use_container_width=True)
+            else:
+                st.info("🌱 Carbon chart unavailable")
+        else:
+            st.info("🌱 No carbon trend data available")
     
     st.divider()
     
-    # Additional insights row
+    # Additional insights row - REAL DATA
     insight_col1, insight_col2 = st.columns([2, 1])
     
     with insight_col1:
-        # Recent activity table - ✅ Use demo data
         st.subheader("📋 Recent Vessel Movements")
+        recent = data_service.get_recent_movements(limit=10)
         
-        recent_data = pd.DataFrame(demo.get_recent_vessels(5))
-        
-        if not recent_data.empty:
-            # Select and rename columns for display
-            display_cols = {
-                'vessel_name': 'Vessel',
-                'from_port': 'From',
-                'to_port': 'To',
-                'status': 'Status',
-                'wait_time_atb_btr': 'Wait (hrs)',
-                'carbon_abatement_tonnes': 'Carbon (t)'
-            }
+        if not recent.empty:
+            # Format for display
+            display_cols = ['vessel_name', 'from_port', 'to_port', 'status', 'wait_time_atb_btr', 'carbon_abatement_tonnes']
+            available_cols = [col for col in display_cols if col in recent.columns]
             
-            display_data = recent_data[list(display_cols.keys())].rename(columns=display_cols)
-            display_data['Wait (hrs)'] = display_data['Wait (hrs)'].round(1)
-            display_data['Carbon (t)'] = display_data['Carbon (t)'].round(1)
-            
-            # Color-code status
-            def color_status(val):
-                colors_map = {
-                    'At Berth': 'background-color: rgba(6, 214, 160, 0.2)',
-                    'In Transit': 'background-color: rgba(0, 180, 216, 0.2)',
-                    'Waiting': 'background-color: rgba(255, 214, 10, 0.2)',
-                    'DEPARTED': 'background-color: rgba(160, 160, 160, 0.2)'
+            if available_cols:
+                display_df = recent[available_cols].copy()
+                
+                # Rename columns
+                rename_map = {
+                    'vessel_name': 'Vessel',
+                    'from_port': 'From',
+                    'to_port': 'To',
+                    'status': 'Status',
+                    'wait_time_atb_btr': 'Wait (hrs)',
+                    'carbon_abatement_tonnes': 'Carbon (t)'
                 }
-                return colors_map.get(val, '')
-            
-            st.dataframe(
-                display_data.style.applymap(color_status, subset=['Status']),
-                use_container_width=True,
-                height=250
-            )
+                display_df = display_df.rename(columns={k: v for k, v in rename_map.items() if k in display_df.columns})
+                
+                # Color-code status
+                def color_status(row):
+                    if 'Status' not in row.index:
+                        return [''] * len(row)
+                    
+                    status = row['Status']
+                    colors_map = {
+                        'At Berth': 'background-color: rgba(6, 214, 160, 0.2)',
+                        'In Transit': 'background-color: rgba(0, 180, 216, 0.2)',
+                        'Waiting': 'background-color: rgba(255, 214, 10, 0.2)',
+                        'Departed': 'background-color: rgba(160, 160, 160, 0.2)',
+                        'DEPARTED': 'background-color: rgba(160, 160, 160, 0.2)'
+                    }
+                    color = colors_map.get(status, '')
+                    return [color] * len(row)
+                
+                styled_df = display_df.style.apply(color_status, axis=1)
+                st.dataframe(styled_df, use_container_width=True, height=250)
+            else:
+                st.info("No displayable columns in recent movements")
         else:
-            st.info("No recent vessel movements")
+            st.info("📋 No recent movements available")
     
     with insight_col2:
-        st.plotly_chart(create_vessel_status_chart(), use_container_width=True)
+        status_dist = data_service.get_vessel_status_distribution()
+        if status_dist:
+            status_chart = create_vessel_status_chart(status_dist)
+            if status_chart:
+                st.plotly_chart(status_chart, use_container_width=True)
+            else:
+                st.info("🚢 Status chart unavailable")
+        else:
+            st.info("🚢 No status data available")
     
     st.divider()
     
-    # AI Insights Section
+    # AI Insights Section - DYNAMIC BASED ON REAL DATA
     st.subheader("🤖 AI-Generated Insights")
     
     insights_col1, insights_col2 = st.columns(2)
     
     with insights_col1:
-        st.info("""
-        **📊 Bunching Alert**
-        
-        3 vessels scheduled to arrive at Singapore Terminal 4 between 14:00-16:00 today.
-        
-        **Recommendation:** Stagger arrivals by 45 minutes to optimize berth utilization.
-        
-        **Impact:** Reduce wait time by ~2.1 hours, save $4,200 in bunker costs.
-        """)
+        # Dynamic insight based on actual wait times
+        if kpis['avg_wait_time'] > 3:
+            st.warning(f"""
+            **⚠️ Wait Time Alert**
+            
+            Current average wait time of {kpis['avg_wait_time']:.1f} hours exceeds the 2-hour target.
+            
+            **Impact:** Potential delays affecting {kpis['active_vessels']} active vessels.
+            
+            **Recommendation:** Review berth allocation and consider staggering arrivals.
+            """)
+        elif kpis['arrival_accuracy'] < 85:
+            st.info(f"""
+            **📊 Accuracy Alert**
+            
+            Arrival accuracy at {kpis['arrival_accuracy']:.1f}% is below target (90%).
+            
+            **Recommendation:** Review ETA prediction models and vessel communication protocols.
+            """)
+        else:
+            st.success(f"""
+            **✅ Strong Performance**
+            
+            Operations running smoothly with {kpis['arrival_accuracy']:.1f}% arrival accuracy.
+            
+            **Highlights:**
+            - Wait time within target: {kpis['avg_wait_time']:.1f} hrs
+            - Berth utilization optimal: {kpis['berth_utilization']:.1f}%
+            - {kpis['total_vessels']} vessels processed
+            """)
     
     with insights_col2:
-        st.success("""
+        # Dynamic carbon insight
+        carbon_metrics = data_service.get_carbon_metrics()
+        st.success(f"""
         **🌱 Sustainability Win**
         
-        Your optimizations this week saved 45 tonnes of CO₂ emissions - equivalent to:
-        - 🚗 Taking 9 cars off the road for a year
-        - 🌳 Planting 2,100 trees
+        Your optimizations have saved {carbon_metrics['total_saved']:.0f} tonnes of CO₂ emissions:
         
-        **Target Progress:** 89% of monthly goal
+        - 🌳 Equivalent to planting {carbon_metrics['trees_equivalent']:,} trees
+        - 🚗 {carbon_metrics['cars_equivalent']} cars off the road for a year
+        
+        **Impact:** ${kpis['bunker_savings']/1000:.1f}K in bunker cost savings
         """)
     
-    # Alerts row
+    # Alerts row - DYNAMIC
     st.divider()
     st.subheader("⚠️ Active Alerts")
     
     alert_col1, alert_col2, alert_col3 = st.columns(3)
     
+    # Generate dynamic alerts based on real data
+    alerts_shown = 0
+    
     with alert_col1:
-        st.warning("""
-        **Weather Advisory**
-        
-        Strong winds (35 knots) expected at Rotterdam port tomorrow 08:00-14:00.
-        
-        3 affected vessels - consider schedule adjustment.
-        """)
+        if kpis['berth_utilization'] > 85:
+            st.warning(f"""
+            **High Utilization**
+            
+            Berth utilization at {kpis['berth_utilization']:.1f}% - approaching capacity limit.
+            
+            Consider optimizing schedule to prevent congestion.
+            """)
+            alerts_shown += 1
+        elif alerts_shown == 0:
+            st.info("""
+            **System Status**
+            
+            All berth operations within normal parameters.
+            """)
     
     with alert_col2:
-        st.error("""
-        **Delayed Arrival**
-        
-        MSC Mediterranean (IMO: 9567890) delayed by 6.2 hours due to port congestion.
-        
-        Berth #7 now available ahead of schedule.
-        """)
+        if kpis['avg_wait_time'] > 4:
+            st.error(f"""
+            **Critical Wait Times**
+            
+            Average wait time {kpis['avg_wait_time']:.1f} hours exceeds critical threshold.
+            
+            Immediate action recommended.
+            """)
+            alerts_shown += 1
+        elif alerts_shown == 0:
+            st.info("""
+            **Queue Status**
+            
+            Vessel queue processing efficiently.
+            """)
     
     with alert_col3:
-        st.info("""
-        **Optimization Opportunity**
-        
-        Berth #12 utilization at 45% this week.
-        
-        Potential to reassign 2 vessels for better efficiency.
-        """)
+        if kpis['arrival_accuracy'] < 80:
+            st.error(f"""
+            **Accuracy Issue**
+            
+            Arrival accuracy {kpis['arrival_accuracy']:.1f}% significantly below target.
+            
+            Review vessel tracking systems.
+            """)
+            alerts_shown += 1
+        else:
+            st.info("""
+            **Performance**
+            
+            Arrival accuracy within acceptable range.
+            """)
+    
+    # Footer stats
+    st.divider()
+    st.caption(f"📊 Dashboard showing data for {kpis['total_vessels']} total vessels | Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")

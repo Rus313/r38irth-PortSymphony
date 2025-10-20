@@ -131,42 +131,131 @@ class PDFDataLoader:
             self.vessels_df = self.df[['vessel_name', 'imo_number', 'operator', 'service']].drop_duplicates()
 
     def _create_sample_data(self):
-        """Create sample data if PDF loading fails"""
-        logger.warning("📦 Using sample data")
-        
+        """Create expanded sample data covering ~1 year of weekly trips per vessel."""
+        logger.warning("📦 Using expanded 1-year sample data (weekly trips per vessel)")
+
         now = datetime.now()
-        
+
+        # Base vessel info (10 unique vessels)
+        base_vessels = [
+            "MV RAPID VOYAGER", "MV SOUTHERN SEAWAY", "MV WESTERN AURORA",
+            "MV EASTERN FALCON", "MV TRUST SEAL", "BRIGHT DOLPHIN",
+            "EMERALD ORCA", "MSC Diana", "CMA CGM Antoine", "Maersk Essex"
+        ]
+        base_imos = [
+            '6280239', '8506594', '9888242', '1709981', '2614463',
+            '7173371', '9234567', '9876543', '9454436', '9632101'
+        ]
+        base_services = ['DF5', 'KP9', 'HWI', '59H', '15P', 'DF5', '5RC', 'AE1', 'FAL', 'TP1']
+        base_ops = ['GRN', 'NVX', 'DPT', 'EVO', 'GRN', 'SVQ', 'DPT', 'MSC', 'CMA', 'MAE']
+        base_from = ['Singapore', 'Los Angeles', 'Tokyo', 'Taiwan', 'Osaka', 'Seattle', 'Jakarta', 'Singapore', 'Rotterdam', 'Los Angeles']
+        base_to = ['Seattle', 'Dubai', 'Algeciras', 'Panama', 'Italy', 'Tokyo', 'Jakarta', 'Rotterdam', 'Singapore', 'Shanghai']
+        base_berths = ['B01', 'B02', 'B03', 'B04', 'B05', 'B06', 'B07', 'B08', 'B01', 'B02']
+
+        # Build lists for all rows
+        operators = []
+        services = []
+        directions = []
+        business_unit = []
+        vessel_name = []
+        imo_number = []
+        rotation_no = []
+        from_port = []
+        to_port = []
+        berth = []
+        status = []
+        atb = []
+        atu = []
+        wait_time_atb_btr = []
+        berth_time_hours = []
+        arrival_accuracy_final_btr = []
+        bunker_saved_usd = []
+        carbon_abatement_tonnes = []
+
+        # Variation bases for numeric fields (per vessel)
+        base_wait = [5.0, 5.2, 8.5, 5.4, 6.0, 5.6, 4.2, 2.2, 3.9, 6.1]
+        base_berth_time = [30, 24, 8, 36, 42, 30, 28, 25, 30, 22]
+        base_accuracy = [95.5, 92.3, 88.1, 94.2, 91.0, 96.8, 93.5, 97.2, 89.8, 94.6]
+        base_bunker = [35000, 25500, 19600, 23800, 18300, 16000, 21200, 28400, 17900, 24600]
+        base_carbon = [0.20, 0.23, 0.14, 0.36, 0.23, 0.16, 0.19, 0.31, 0.16, 0.28]
+
+        weeks_back = 52  # 52 weekly entries per vessel (~1 year)
+        for i in range(len(base_vessels)):
+            v = base_vessels[i]
+            imo = base_imos[i]
+            svc = base_services[i]
+            op = base_ops[i]
+            fr = base_from[i]
+            to = base_to[i]
+            base_berth = base_berths[i]
+
+            for w in range(weeks_back):
+                # deterministic staggering so rows are unique and cover months
+                row_time = now - timedelta(weeks=w, hours= (i * 6))
+                operators.append(op)
+                services.append(svc)
+                directions.append('W' if (i + w) % 2 == 0 else 'E')
+                business_unit.append('Container')
+                vessel_name.append(v)
+                imo_number.append(imo)
+                rotation_no.append(f"2025{1000 + i*100 + w}")  # unique-ish rotation
+                from_port.append(fr)
+                to_port.append(to)
+                berth.append(base_berth)
+
+                # cycle statuses for realism
+                stat = ['DEPARTED', 'At Berth', 'Waiting', 'Scheduled', 'DEPARTED'][(w + i) % 5]
+                status.append(stat)
+
+                # atb and atu
+                atb.append(row_time)
+                if stat == 'Scheduled':
+                    atu.append(None)
+                else:
+                    # ATU ~ ATB + 12h plus some deterministic offset
+                    atu.append(row_time + timedelta(hours=12 + ((w + i) % 6)))
+
+                # metrics: slightly vary base values over weeks deterministically (no random)
+                week_factor = 1 + (((w % 8) - 4) / 100.0)  # small oscillation +/- ~4%
+                idx = i % len(base_wait)
+
+                wait_time_atb_btr.append(round(base_wait[idx] * week_factor, 2))
+                berth_time_hours.append(round(base_berth_time[idx] * week_factor, 2))
+                arrival_accuracy_final_btr.append(round(base_accuracy[idx] * week_factor, 1))
+                bunker_saved_usd.append(round(base_bunker[idx] * week_factor, 2))
+                carbon_abatement_tonnes.append(round(base_carbon[idx] * week_factor, 3))
+
+        # Build DataFrame
         self.df = pd.DataFrame({
-            'operator': ['GRN', 'NVX', 'DPT', 'EVO', 'GRN', 'SVQ', 'DPT', 'MSC', 'CMA', 'MAE'],
-            'service': ['DF5', 'KP9', 'HWI', '59H', '15P', 'DF5', '5RC', 'AE1', 'FAL', 'TP1'],
-            'direction': ['W', 'E', 'W', 'W', 'W', 'E', 'E', 'W', 'E', 'W'],
-            'business_unit': ['Container'] * 10,
-            'vessel_name': ['MV RAPID VOYAGER', 'MV SOUTHERN SEAWAY', 'MV WESTERN AURORA', 
-                           'MV EASTERN FALCON', 'MV TRUST SEAL', 'BRIGHT DOLPHIN',
-                           'EMERALD ORCA', 'MSC Diana', 'CMA CGM Antoine', 'Maersk Essex'],
-            'imo_number': ['6280239', '8506594', '9888242', '1709981', '2614463', 
-                          '7173371', '9234567', '9876543', '9454436', '9632101'],
-            'rotation_no': ['20251001', '20251002', '20251003', '20251004', '20251005',
-                           '20251006', '20251007', '20251008', '20251009', '20251010'],
-            'from_port': ['Singapore', 'Los Angeles', 'Tokyo', 'Taiwan', 'Osaka',
-                         'Seattle', 'Jakarta', 'Singapore', 'Rotterdam', 'Los Angeles'],
-            'to_port': ['Seattle', 'Dubai', 'Algeciras', 'Panama', 'Italy',
-                       'Tokyo', 'Jakarta', 'Rotterdam', 'Singapore', 'Shanghai'],
-            'berth': ['B01', 'B02', 'B03', 'B04', 'B05', 'B06', 'B07', 'B08', 'B01', 'B02'],
-            'status': ['DEPARTED'] * 10,
-            'atb': [now - timedelta(days=i) for i in range(10)],
-            'atu': [now - timedelta(days=i, hours=-24) for i in range(10)],
-            'wait_time_atb_btr': [4.92, 5.17, 8.83, 5.46, 5.97, 5.63, 4.21, 2.15, 3.87, 6.12],
-            'berth_time_hours': [31.26, 23.96, 8.0, 36.23, 42.38, 30.59, 28.14, 25.33, 29.87, 22.45],
-            'arrival_accuracy_final_btr': [95.5, 92.3, 88.1, 94.2, 91.0, 96.8, 93.5, 97.2, 89.8, 94.6],
-            'bunker_saved_usd': [35776.21, 25568.79, 19575.91, 23862.37, 18299.25,
-                                15986.41, 21234.56, 28456.78, 17890.12, 24567.89],
-            'carbon_abatement_tonnes': [0.204, 0.228, 0.135, 0.357, 0.232, 
-                                       0.162, 0.189, 0.312, 0.156, 0.278]
+            'operator': operators,
+            'service': services,
+            'direction': directions,
+            'business_unit': business_unit,
+            'vessel_name': vessel_name,
+            'imo_number': imo_number,
+            'rotation_no': rotation_no,
+            'from_port': from_port,
+            'to_port': to_port,
+            'berth': berth,
+            'status': status,
+            'atb': atb,
+            'atu': atu,
+            'wait_time_atb_btr': wait_time_atb_btr,
+            'berth_time_hours': berth_time_hours,
+            'arrival_accuracy_final_btr': arrival_accuracy_final_btr,
+            'bunker_saved_usd': bunker_saved_usd,
+            'carbon_abatement_tonnes': carbon_abatement_tonnes
         })
-        
+
+        # Ensure types
+        if 'atb' in self.df.columns:
+            self.df['atb'] = pd.to_datetime(self.df['atb'], errors='coerce')
+        if 'atu' in self.df.columns:
+            self.df['atu'] = pd.to_datetime(self.df['atu'], errors='coerce')
+
+        # Create vessels lookup
         self._create_vessels_df()
-    
+
     # ============================================
     # DATABASE-LIKE INTERFACE METHODS
     # ============================================
